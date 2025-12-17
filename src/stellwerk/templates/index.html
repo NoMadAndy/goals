@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_title }}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">⚙</div>
+        <div>
+          <div class="title">Stellwerk</div>
+          <div class="subtitle">Weichen stellen. Strecke fahren. Ziele erreichen.</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="card">
+          <h2>Ziele</h2>
+          <form method="post" action="/goals" class="stack">
+            <input name="title" placeholder="Neues Ziel…" />
+            <textarea name="description" placeholder="Optional: Notizen / warum ist es wichtig?"></textarea>
+            <button type="submit">Ziel anlegen</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <h3>Deine Stellwerke</h3>
+          <div class="goal-list">
+            {% if goals|length == 0 %}
+              <div class="muted">Noch kein Ziel. Leg eins an.</div>
+            {% endif %}
+            {% for g in goals %}
+              <a class="goal-item {% if selected_goal and g.id == selected_goal.id %}active{% endif %}" href="/?goal={{ g.id }}">
+                <div class="goal-item-title">{{ g.title }}</div>
+                <div class="goal-item-desc">{{ g.description }}</div>
+              </a>
+            {% endfor %}
+          </div>
+        </section>
+      </aside>
+
+      <section class="content">
+        {% if not selected_goal %}
+          <section class="card hero">
+            <h1>Willkommen im Stellwerk</h1>
+            <p>
+              Du stellst nicht eine große Weiche, sondern viele kleine.
+              Lege ein Ziel an, dann lass dir Aufgaben und Arbeitspakete planen.
+            </p>
+          </section>
+        {% else %}
+          <section class="card hero">
+            <h1>{{ selected_goal.title }}</h1>
+            <p class="prologue">{{ selected_goal.prologue or "" }}</p>
+            <p class="muted">{{ selected_goal.description }}</p>
+            {% if selected_goal.plan_source %}
+              <div class="plan-source">Planquelle: <span class="pill">{{ "OpenAI" if selected_goal.plan_source == "openai" else "Heuristik" }}</span></div>
+            {% endif %}
+            {% if selected_goal.rallying_cry %}
+              <div class="rally">{{ selected_goal.rallying_cry }}</div>
+            {% endif %}
+          </section>
+
+          <section class="card">
+            <div class="row">
+              <h2>Strecke</h2>
+              <form method="post" action="/goals/{{ selected_goal.id }}/plan" class="row-right">
+                <input name="context" placeholder="Optionaler Kontext (Zeit, Ressourcen, Constraints)…" />
+                <button type="submit">KI: Plan erstellen</button>
+              </form>
+            </div>
+
+            {% include "track.html" %}
+          </section>
+
+          <section class="card details">
+            <h2>Arbeitspakete</h2>
+            {% if selected_goal.tasks|length == 0 %}
+              <div class="muted">Noch keine Aufgaben. Klicke auf „KI: Plan erstellen“.</div>
+            {% endif %}
+
+            {% for t in selected_goal.tasks %}
+              <div class="task">
+                <div class="task-title">{{ t.title }}</div>
+                <div class="packages">
+                  {% for wp in t.work_packages %}
+                    <div class="package">
+                      <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
+                        <button type="submit" class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
+                          <div class="package-title">{{ wp.title }}</div>
+                          <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10</div>
+                        </button>
+                      </form>
+                      <a class="package-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Details</a>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </section>
+        {% endif %}
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span class="muted">Stellwerk · Persistenz: {{ persistence }}</span>
+    </footer>
+
+    {% include "debug_console.html" %}
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{% if debug_enabled %}
+<div id="debugConsole" class="debug-console" data-open="false">
+  <div class="debug-bar">
+    <button id="debugToggle" class="debug-toggle" type="button">Debug</button>
+    <div class="debug-status" id="debugStatus">verbinden…</div>
+    <div class="debug-spacer"></div>
+    <button id="debugClear" class="debug-clear" type="button">Leeren</button>
+  </div>
+  <div class="debug-body">
+    <pre id="debugLog" class="debug-log"></pre>
+  </div>
+</div>
+<script src="/static/debug.js"></script>
+{% endif %}

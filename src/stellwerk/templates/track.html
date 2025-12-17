@@ -1,0 +1,64 @@
+{% set segments = [] %}
+{% if selected_goal %}
+  {% for t in selected_goal.tasks %}
+    {% for wp in t.work_packages %}
+      {% set _ = segments.append(wp) %}
+    {% endfor %}
+  {% endfor %}
+{% endif %}
+
+{% set total = 0 %}
+{% for s in segments %}
+  {% set total = total + (s.length or 1) %}
+{% endfor %}
+{% if total == 0 %}{% set total = 1 %}{% endif %}
+
+<div class="track-wrap">
+  <div class="track-legend">
+    <span class="pill">Länge = Aufwand</span>
+    <span class="pill">Steigung = Schwierigkeit</span>
+    <span class="pill">Klick auf Arbeitspaket: erledigt ↔ offen</span>
+  </div>
+
+  <svg class="track" viewBox="0 0 1000 180" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Zugstrecke">
+    <!-- Schienen -->
+    <line x1="40" y1="120" x2="960" y2="120" class="rail" />
+    <line x1="40" y1="145" x2="960" y2="145" class="rail" />
+
+    <!-- Schwellen -->
+    {% for i in range(0, 28) %}
+      <line x1="{{ 60 + i*32 }}" y1="112" x2="{{ 60 + i*32 }}" y2="153" class="sleeper" />
+    {% endfor %}
+
+    <!-- Lok -->
+    <g transform="translate(45,60)">
+      <rect x="0" y="40" width="90" height="55" rx="14" class="loco" />
+      <rect x="55" y="18" width="35" height="35" rx="10" class="loco" />
+      <circle cx="25" cy="105" r="12" class="wheel" />
+      <circle cx="65" cy="105" r="12" class="wheel" />
+      <rect x="6" y="55" width="40" height="10" rx="5" class="shine" />
+    </g>
+
+    <!-- Waggons / Segmente -->
+    {% set x = 160 %}
+    {% for s in segments %}
+      {% set w = 740 * ( (s.length or 1) / total ) %}
+      {% set g = (s.grade or 0) %}
+      {% set y = 86 - (g * 2) %}
+
+      <g transform="translate({{ x }},{{ y }})">
+        <rect x="0" y="0" width="{{ w }}" height="50" rx="14" class="wagon {% if s.status.value == 'done' %}done{% endif %}" />
+        <text x="12" y="20" class="wagon-title">{{ s.title }}</text>
+        <text x="12" y="38" class="wagon-meta">L {{ s.length }} · S {{ s.grade }}/10</text>
+        <circle cx="20" cy="68" r="10" class="wheel" />
+        <circle cx="{{ (w|float) - 20 }}" cy="68" r="10" class="wheel" />
+      </g>
+
+      {% set x = x + w + 12 %}
+    {% endfor %}
+
+    {% if segments|length == 0 %}
+      <text x="160" y="70" class="muted-svg">Noch keine Strecke. Erstelle einen Plan.</text>
+    {% endif %}
+  </svg>
+</div>

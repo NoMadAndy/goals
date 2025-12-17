@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_title }} · Arbeitspaket</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">⚙</div>
+        <div>
+          <div class="title">Stellwerk</div>
+          <div class="subtitle">Details · {{ goal.title }}</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout single">
+      <section class="content">
+        <section class="card">
+          <div class="row">
+            <h2>Arbeitspaket</h2>
+            <a class="link" href="/?goal={{ goal.id }}">← zurück zur Strecke</a>
+          </div>
+
+          <div class="muted">Aufgabe: {{ task_title }}</div>
+
+          <form method="post" action="/goals/{{ goal.id }}/packages/{{ wp.id }}" class="stack" style="margin-top:12px">
+            <label class="label">Titel</label>
+            <input name="title" value="{{ wp.title }}" />
+
+            <label class="label">Notizen (dein Kontext, Stolpersteine, Definition of Done)</label>
+            <textarea name="notes" placeholder="Was ist hier genau zu tun?">{{ wp.notes }}</textarea>
+
+            <div class="grid2">
+              <div>
+                <label class="label">Länge (Aufwand)</label>
+                <input name="length" type="number" min="1" max="50" value="{{ wp.length }}" />
+              </div>
+              <div>
+                <label class="label">Steigung (0–10)</label>
+                <input name="grade" type="number" min="0" max="10" value="{{ wp.grade }}" />
+              </div>
+            </div>
+
+            <label class="label">Status</label>
+            <select name="status" class="select">
+              <option value="todo" {% if wp.status.value == 'todo' %}selected{% endif %}>offen</option>
+              <option value="done" {% if wp.status.value == 'done' %}selected{% endif %}>erledigt</option>
+              <option value="diverted" {% if wp.status.value == 'diverted' %}selected{% endif %}>umgeleitet (Weiche)</option>
+            </select>
+
+            <div class="row" style="margin-top:6px">
+              <button type="submit">Speichern</button>
+              <div class="muted">Persistenz: {{ persistence }}</div>
+            </div>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    {% include "debug_console.html" %}
+  </body>
+</html>

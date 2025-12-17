@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=stellwerk
+      - POSTGRES_USER=stellwerk
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-stellwerk-prod}
+    volumes:
+      - stellwerk-db-prod:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  stellwerk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stellwerk:prod
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql+psycopg://stellwerk:${POSTGRES_PASSWORD:-stellwerk-prod}@db:5432/stellwerk
+      - STELLWERK_DEBUG=${STELLWERK_DEBUG:-0}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+    restart: unless-stopped
+
+volumes:
+  stellwerk-db-prod:
