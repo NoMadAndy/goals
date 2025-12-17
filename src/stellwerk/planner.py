@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from stellwerk.debug import debug_log
-from stellwerk.models import Goal, Task, WorkPackage
+from stellwerk.models import Decision, DecisionOption, Goal, Person, PersonDirection, PersonRole, Route, Task, WorkPackage
 from stellwerk.settings import settings
 
 
@@ -52,8 +52,10 @@ def heuristic_plan(req: PlanRequest) -> Goal:
     )
     rallying = "Heute reicht ein guter Schritt. Der Rest rollt danach."
 
-    # 3–5 Aufgaben
-    task_count = rng.randint(3, 5)
+    # Richer decomposition: 5–9 tasks depending on input length
+    word_count = len((req.raw_goal or "").split())
+    base_tasks = 6 if word_count >= 8 else 5
+    task_count = rng.randint(base_tasks, base_tasks + 3)
     task_templates = [
         "Zielbild schärfen",
         "Ressourcen & Zeitfenster klären",
@@ -153,49 +155,101 @@ def heuristic_plan(req: PlanRequest) -> Goal:
         ],
     }
 
-    tasks: list[Task] = []
-    for task_title in task_templates[:task_count]:
-        suggestions = list(concrete.get(task_title, []))
-        rng.shuffle(suggestions)
+    def build_tasks(*, bias: str) -> list[Task]:
+        tasks: list[Task] = []
+        for task_title in task_templates[:task_count]:
+            suggestions = list(concrete.get(task_title, []))
+            rng.shuffle(suggestions)
 
-        wp_count = rng.randint(2, 4)
-        work_packages: list[WorkPackage] = []
+            # More WPs when goal is complex; bias can nudge the count.
+            wp_min = 4 if word_count >= 8 else 3
+            wp_max = 7 if word_count >= 12 else 6
+            if bias == "direct":
+                wp_min, wp_max = max(3, wp_min - 1), max(5, wp_max - 1)
+            elif bias == "safe":
+                wp_min, wp_max = wp_min, wp_max
+            elif bias == "experiment":
+                wp_min, wp_max = wp_min, wp_max + 1
 
-        if suggestions:
-            picked = suggestions[: min(wp_count, len(suggestions))]
-            for wp_title, wp_notes, (len_min, len_max), (gr_min, gr_max) in picked:
+            wp_count = rng.randint(wp_min, wp_max)
+            work_packages: list[WorkPackage] = []
+
+            if suggestions:
+                picked = suggestions[: min(wp_count, len(suggestions))]
+                for wp_title, wp_notes, (len_min, len_max), (gr_min, gr_max) in picked:
+                    # Bias tweaks: direct slightly shorter, experiment slightly steeper.
+                    length = rng.randint(len_min, len_max)
+                    grade = rng.randint(gr_min, gr_max)
+                    if bias == "direct":
+                        length = max(1, length - 1)
+                    if bias == "experiment":
+                        grade = min(10, grade + 1)
+                    work_packages.append(
+                        WorkPackage(
+                            title=wp_title,
+                            notes=wp_notes,
+                            length=length,
+                            grade=grade,
+                        )
+                    )
+
+            # Fallback: falls eine Aufgabe mehr Pakete braucht als wir Vorschläge haben.
+            while len(work_packages) < wp_count:
+                i = len(work_packages) + 1
+                length = rng.randint(1, 6)
+                grade = rng.randint(0, 10)
+                if bias == "direct":
+                    length = max(1, length - 1)
+                if bias == "experiment":
+                    grade = min(10, grade + 1)
                 work_packages.append(
                     WorkPackage(
-                        title=wp_title,
-                        notes=wp_notes,
-                        length=rng.randint(len_min, len_max),
-                        grade=rng.randint(gr_min, gr_max),
+                        title=f"{task_title}: Schritt {i}",
+                        notes=(
+                            "Tätigkeiten:\n- Konkreten nächsten Mini-Schritt definieren\n- Umsetzen\n- Ergebnis kurz notieren\n"
+                            "- Blocker/Entscheidung festhalten (falls nötig)\n\n"
+                            "Definition of Done:\n- Der Mini-Schritt ist erledigt und dokumentiert."
+                        ),
+                        length=length,
+                        grade=grade,
                     )
                 )
 
-        # Fallback: falls eine Aufgabe mehr Pakete braucht als wir Vorschläge haben.
-        while len(work_packages) < wp_count:
-            i = len(work_packages) + 1
-            length = rng.randint(1, 5)
-            grade = rng.randint(0, 10)
-            work_packages.append(
-                WorkPackage(
-                    title=f"{task_title}: Schritt {i}",
-                    notes=(
-                        "Tätigkeiten:\n- Konkreten nächsten Mini-Schritt definieren\n- Umsetzen\n- Ergebnis kurz notieren\n\n"
-                        "Definition of Done:\n- Der Mini-Schritt ist erledigt und dokumentiert."
-                    ),
-                    length=length,
-                    grade=grade,
-                )
-            )
+            tasks.append(Task(title=task_title, work_packages=work_packages))
+        return tasks
 
-        tasks.append(Task(title=task_title, work_packages=work_packages))
+    # 2–3 alternative Routen
+    route_count = 3 if word_count >= 10 else 2
+    route_specs = [
+        ("Direkt & fokussiert", "Schnell fahrbar, klare Timeboxes, wenige Umwege.", "direct"),
+        ("Sicher & robust", "Risiken minimieren, Abhängigkeiten klären, saubere Absicherung.", "safe"),
+        ("Experiment & Lernen", "Hypothesen testen, Feedbackschleifen, iteratives Lernen.", "experiment"),
+    ]
+    rng.shuffle(route_specs)
+    chosen_specs = route_specs[:route_count]
+
+    routes: list[Route] = []
+    for name, desc, bias in chosen_specs:
+        routes.append(Route(title=name, description=desc, tasks=build_tasks(bias=bias)))
+
+    # Eine Weiche: Route auswählen
+    decision = Decision(
+        title="Weiche stellen: Welche Route passt heute?",
+        prompt=(
+            "Entscheide bewusst: Was ist wichtiger – Geschwindigkeit, Sicherheit oder Lernen? "
+            "Du kannst die Weiche später umstellen."
+        ),
+        options=[DecisionOption(label=r.title, route_id=r.id) for r in routes],
+    )
+    decision.chosen_option_id = decision.options[0].id if decision.options else None
 
     return Goal(
         title=title,
         description=smart,
-        tasks=tasks,
+        routes=routes,
+        decisions=[decision],
+        people=[],
+        active_route_id=routes[0].id if routes else None,
         prologue=prologue,
         rallying_cry=rallying,
     )
@@ -245,10 +299,20 @@ async def openai_plan(req: PlanRequest) -> PlanResult:
 
     prompt = (
         "Du bist ein Planungsassistent für eine App namens 'Stellwerk'.\n"
-        "Formuliere aus der Nutzereingabe ein motivierendes Ziel (SMART-ish), "
-        "und zerlege es in 3-5 Aufgaben und je Aufgabe 2-4 Arbeitspakete.\n"
-        "Für jedes Arbeitspaket liefere: title, notes, length (1-5), grade (0-10).\n"
-        "Antworte ausschließlich als JSON mit Schema: {title, description, prologue, rallying_cry, tasks:[{title, notes, work_packages:[{title, notes, length, grade}]}]}.\n\n"
+        "Ziel: Ein maximales, detailliertes Konzept als verzweigter Fahrplan.\n\n"
+        "Erzeuge 2 bis 3 ALTERNATIVE Routen zum Ziel. Jede Route hat eigene Aufgaben und Arbeitspakete.\n"
+        "Jede Route hat 5-9 Aufgaben. Jede Aufgabe hat 3-8 Arbeitspakete.\n"
+        "Arbeitspaket-Felder: title, notes (konkrete Tätigkeiten + Definition of Done), length (1-8), grade (0-10).\n\n"
+        "Erzeuge genau eine Weiche (Entscheidungsknoten), die eine Route auswählt.\n"
+        "Schema (JSON):\n"
+        "{\n"
+        "  title, description, prologue, rallying_cry,\n"
+        "  people:[{name, role:(companion|helper), direction:(with_me|ahead), notes}],\n"
+        "  routes:[{title, description, tasks:[{title, notes, work_packages:[{title, notes, length, grade}]}]}],\n"
+        "  decisions:[{title, prompt, options:[{label, route_index}], chosen_option_index}]\n"
+        "}\n\n"
+        "WICHTIG: decisions.options.route_index referenziert die Position in routes (0-basiert).\n"
+        "Antworte ausschließlich als JSON-Objekt in genau diesem Schema.\n\n"
         f"Eingabe: {req.raw_goal}\n"
         f"Kontext: {req.context}\n"
     )
@@ -288,28 +352,101 @@ async def openai_plan(req: PlanRequest) -> PlanResult:
         await debug_log("info", "Planner: parsing content", {"chars": len(content or "")})
         parsed = _extract_json_object(content)
 
-        tasks = []
-        for t in parsed.get("tasks", []) or []:
-            wps = []
-            for wp in t.get("work_packages", []) or []:
-                wps.append(
-                    WorkPackage(
-                        title=str(wp.get("title", "")).strip() or "Arbeitspaket",
-                        notes=str(wp.get("notes", "")),
-                        length=int(wp.get("length", 1)),
-                        grade=int(wp.get("grade", 0)),
+        # People
+        people: list[Person] = []
+        for p in parsed.get("people", []) or []:
+            name = str(p.get("name", "")).strip()
+            if not name:
+                continue
+            try:
+                role = PersonRole(str(p.get("role", "companion")))
+            except Exception:
+                role = PersonRole.companion
+            try:
+                direction = PersonDirection(str(p.get("direction", "with_me")))
+            except Exception:
+                direction = PersonDirection.with_me
+            people.append(Person(name=name, role=role, direction=direction, notes=str(p.get("notes", ""))))
+
+        # Routes
+        routes: list[Route] = []
+        for r in parsed.get("routes", []) or []:
+            tasks: list[Task] = []
+            for t in r.get("tasks", []) or []:
+                wps: list[WorkPackage] = []
+                for wp in t.get("work_packages", []) or []:
+                    wps.append(
+                        WorkPackage(
+                            title=str(wp.get("title", "")).strip() or "Arbeitspaket",
+                            notes=str(wp.get("notes", "")),
+                            length=int(wp.get("length", 1)),
+                            grade=int(wp.get("grade", 0)),
+                        )
+                    )
+                tasks.append(
+                    Task(
+                        title=str(t.get("title", "Aufgabe")),
+                        notes=str(t.get("notes", "")),
+                        work_packages=wps,
                     )
                 )
-            tasks.append(Task(title=str(t.get("title", "Aufgabe")), notes=str(t.get("notes", "")), work_packages=wps))
+            routes.append(
+                Route(
+                    title=str(r.get("title", "Route")).strip() or "Route",
+                    description=str(r.get("description", "")),
+                    tasks=tasks,
+                )
+            )
+
+        # Decisions (route_index -> route_id)
+        decisions: list[Decision] = []
+        for d in parsed.get("decisions", []) or []:
+            opts: list[DecisionOption] = []
+            for opt in d.get("options", []) or []:
+                label = str(opt.get("label", "Option")).strip() or "Option"
+                idx = opt.get("route_index", 0)
+                try:
+                    idx_int = int(idx)
+                except Exception:
+                    idx_int = 0
+                route_id = routes[idx_int].id if routes and 0 <= idx_int < len(routes) else (routes[0].id if routes else None)
+                opts.append(DecisionOption(label=label, route_id=route_id))
+            chosen_idx = d.get("chosen_option_index", 0)
+            try:
+                chosen_idx_int = int(chosen_idx)
+            except Exception:
+                chosen_idx_int = 0
+            chosen_option_id = opts[chosen_idx_int].id if opts and 0 <= chosen_idx_int < len(opts) else (opts[0].id if opts else None)
+            decisions.append(
+                Decision(
+                    title=str(d.get("title", "Weiche")).strip() or "Weiche",
+                    prompt=str(d.get("prompt", "")),
+                    options=opts,
+                    chosen_option_id=chosen_option_id,
+                )
+            )
+
+        active_route_id = routes[0].id if routes else None
+        if decisions and decisions[0].chosen_option_id:
+            for opt in decisions[0].options:
+                if opt.id == decisions[0].chosen_option_id and opt.route_id:
+                    active_route_id = opt.route_id
 
         goal = Goal(
             title=str(parsed.get("title", req.raw_goal)).strip() or req.raw_goal,
             description=str(parsed.get("description", "")),
             prologue=str(parsed.get("prologue", "")),
             rallying_cry=str(parsed.get("rallying_cry", "")),
-            tasks=tasks,
+            routes=routes,
+            decisions=decisions,
+            people=people,
+            active_route_id=active_route_id,
         )
-        await debug_log("info", "Planner: OpenAI plan parsed successfully", {"tasks": len(tasks)})
+        await debug_log(
+            "info",
+            "Planner: OpenAI plan parsed successfully",
+            {"routes": len(routes), "decisions": len(decisions), "people": len(people)},
+        )
         return PlanResult(goal=goal, source="openai")
     except Exception as e:
         await debug_log(

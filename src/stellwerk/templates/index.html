@@ -75,33 +75,125 @@
               </form>
             </div>
 
+            {% if selected_goal.people|length > 0 or true %}
+              <div class="people card" style="margin-top:12px">
+                <h3>Begleiter & Helfer</h3>
+                <div class="muted" style="margin-bottom:10px">
+                  Begleiter ziehen mit dir. Helfer sind Personen, bei denen du vorangehst oder die dich aus anderer Perspektive stärken.
+                </div>
+
+                {% if selected_goal.people|length == 0 %}
+                  <div class="muted">Noch niemand eingetragen. Füge Begleiter/Helfer hinzu.</div>
+                {% endif %}
+
+                <div class="stack" style="margin-top:10px">
+                  {% for p in selected_goal.people %}
+                    <form method="post" action="/goals/{{ selected_goal.id }}/people/{{ p.id }}/update" class="card" style="padding:12px">
+                      <div class="row">
+                        <div style="flex:1; min-width: 220px">
+                          <label class="label">Name</label>
+                          <input name="name" value="{{ p.name }}" />
+                        </div>
+                        <div style="min-width: 160px">
+                          <label class="label">Rolle</label>
+                          <select name="role" class="select">
+                            <option value="companion" {% if p.role.value == 'companion' %}selected{% endif %}>Begleiter</option>
+                            <option value="helper" {% if p.role.value == 'helper' %}selected{% endif %}>Helfer</option>
+                          </select>
+                        </div>
+                        <div style="min-width: 160px">
+                          <label class="label">Richtung</label>
+                          <select name="direction" class="select">
+                            <option value="with_me" {% if p.direction.value == 'with_me' %}selected{% endif %}>mit mir</option>
+                            <option value="ahead" {% if p.direction.value == 'ahead' %}selected{% endif %}>ich gehe voran</option>
+                          </select>
+                        </div>
+                      </div>
+                      <label class="label" style="margin-top:8px">Notizen</label>
+                      <textarea name="notes" placeholder="Wie hilft diese Person konkret?">{{ p.notes }}</textarea>
+                      <div class="row" style="margin-top:8px">
+                        <button type="submit">Speichern</button>
+                        <button type="submit" formaction="/goals/{{ selected_goal.id }}/people/{{ p.id }}/delete" class="debug-clear" style="background: rgba(255,255,255,.06); color: var(--text)">Entfernen</button>
+                      </div>
+                    </form>
+                  {% endfor %}
+                </div>
+
+                <form method="post" action="/goals/{{ selected_goal.id }}/people/add" class="stack" style="margin-top:12px">
+                  <div class="row">
+                    <div style="flex:1; min-width: 220px">
+                      <label class="label">Neue Person</label>
+                      <input name="name" placeholder="Name…" />
+                    </div>
+                    <div style="min-width: 160px">
+                      <label class="label">Rolle</label>
+                      <select name="role" class="select">
+                        <option value="companion">Begleiter</option>
+                        <option value="helper">Helfer</option>
+                      </select>
+                    </div>
+                    <div style="min-width: 160px">
+                      <label class="label">Richtung</label>
+                      <select name="direction" class="select">
+                        <option value="with_me">mit mir</option>
+                        <option value="ahead">ich gehe voran</option>
+                      </select>
+                    </div>
+                  </div>
+                  <label class="label">Notizen</label>
+                  <textarea name="notes" placeholder="Kontext, Erwartungen, Zusammenarbeit…"></textarea>
+                  <button type="submit">Person hinzufügen</button>
+                </form>
+              </div>
+            {% endif %}
+
+            {% if selected_goal.decisions|length > 0 %}
+              {% set d = selected_goal.decisions[0] %}
+              <div class="card" style="margin-top:12px">
+                <h3>{{ d.title }}</h3>
+                <div class="muted" style="margin-bottom:10px">{{ d.prompt }}</div>
+                <div class="route-choices">
+                  {% for opt in d.options %}
+                    <form method="post" action="/goals/{{ selected_goal.id }}/decisions/{{ d.id }}/options/{{ opt.id }}/choose">
+                      <button type="submit" class="route-choice {% if d.chosen_option_id and opt.id == d.chosen_option_id %}active{% endif %}">
+                        {{ opt.label }}
+                      </button>
+                    </form>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+
             {% include "track.html" %}
           </section>
 
           <section class="card details">
-            <h2>Arbeitspakete</h2>
-            {% if selected_goal.tasks|length == 0 %}
+            <h2>Arbeitspakete{% if selected_route %} · {{ selected_route.title }}{% endif %}</h2>
+            {% if not selected_route or selected_route.tasks|length == 0 %}
               <div class="muted">Noch keine Aufgaben. Klicke auf „KI: Plan erstellen“.</div>
             {% endif %}
 
-            {% for t in selected_goal.tasks %}
-              <div class="task">
-                <div class="task-title">{{ t.title }}</div>
-                <div class="packages">
-                  {% for wp in t.work_packages %}
-                    <div class="package">
-                      <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
-                        <button type="submit" class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
-                          <div class="package-title">{{ wp.title }}</div>
-                          <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10</div>
-                        </button>
-                      </form>
-                      <a class="package-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Details</a>
-                    </div>
-                  {% endfor %}
+            {% if selected_route %}
+              {% for t in selected_route.tasks %}
+                <div class="task">
+                  <div class="task-title">{{ t.title }}</div>
+                  {% if t.notes %}<div class="muted" style="margin-bottom:10px">{{ t.notes }}</div>{% endif %}
+                  <div class="packages">
+                    {% for wp in t.work_packages %}
+                      <div class="package">
+                        <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
+                          <button type="submit" class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
+                            <div class="package-title">{{ wp.title }}</div>
+                            <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10</div>
+                          </button>
+                        </form>
+                        <a class="package-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Details</a>
+                      </div>
+                    {% endfor %}
+                  </div>
                 </div>
-              </div>
-            {% endfor %}
+              {% endfor %}
+            {% endif %}
           </section>
         {% endif %}
       </section>

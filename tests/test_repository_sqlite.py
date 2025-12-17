@@ -33,8 +33,10 @@ def test_repository_roundtrip_sqlite():
     with open_session(engine) as session:
         goal = get_goal(session, goal_id)
         assert goal is not None
-        assert len(goal.tasks) >= 3
-        first_wp = goal.tasks[0].work_packages[0]
+        route = goal.selected_route()
+        assert route is not None
+        assert len(route.tasks) >= 5
+        first_wp = route.tasks[0].work_packages[0]
 
     with open_session(engine) as session:
         toggle_work_package(session, first_wp.id)
@@ -42,7 +44,9 @@ def test_repository_roundtrip_sqlite():
     with open_session(engine) as session:
         goal2 = get_goal(session, goal_id)
         assert goal2 is not None
-        wp2 = goal2.tasks[0].work_packages[0]
+        route2 = goal2.selected_route()
+        assert route2 is not None
+        wp2 = route2.tasks[0].work_packages[0]
         assert wp2.status.value == "done"
 
 
@@ -60,7 +64,9 @@ def test_update_work_package_persists_notes_and_status():
     with open_session(engine) as session:
         goal = get_goal(session, goal_id)
         assert goal is not None
-        wp = goal.tasks[0].work_packages[0]
+        route = goal.selected_route()
+        assert route is not None
+        wp = route.tasks[0].work_packages[0]
 
     with open_session(engine) as session:
         update_work_package(
@@ -76,7 +82,9 @@ def test_update_work_package_persists_notes_and_status():
     with open_session(engine) as session:
         goal2 = get_goal(session, goal_id)
         assert goal2 is not None
-        wp2 = goal2.tasks[0].work_packages[0]
+        route2 = goal2.selected_route()
+        assert route2 is not None
+        wp2 = route2.tasks[0].work_packages[0]
         assert wp2.title == "Neuer Titel"
         assert wp2.notes == "Definition of Done: fertig."
         assert wp2.length == 3

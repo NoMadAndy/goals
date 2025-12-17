@@ -14,4 +14,17 @@ Das Format orientiert sich an *Keep a Changelog* und die Versionsnummern folgen 
 - In-App Debug-Konsole (Snapshot + SSE Stream) inkl. Request/Planner-Tracing.
 - Docker/Compose-Deployments für Preprod/Prod sowie Dev-Startscript.
 
+## [0.1.0-rc.2] - 2025-12-17
+
+### Added
+- Verzweigte Planung: 2–3 alternative Routen pro Ziel mit eigener Aufgaben-/Arbeitspaketstruktur.
+- „Weiche stellen“-Entscheidung, um eine Route aktiv auszuwählen.
+- Editierbare Begleiter/Helfer (Personen) direkt auf der Zielseite.
+- Mehrspurige SVG-Strecke mit Weichen-Visualisierung und aktiver Route.
+
+### Changed
+- Heuristik-Planer erstellt deutlich granularere Pläne (mehr Aufgaben und Arbeitspakete, abhängig von Eingabe).
+
+[0.1.0-rc.2]: https://github.com/NoMadAndy/goals/releases/tag/v0.1.0-rc.2
+
 [0.1.0-rc.1]: https://github.com/NoMadAndy/goals/releases/tag/v0.1.0-rc.1

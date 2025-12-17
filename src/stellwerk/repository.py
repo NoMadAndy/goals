@@ -6,8 +6,28 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from stellwerk.db import GoalRow, TaskRow, WorkPackageRow
-from stellwerk.models import Goal, GoalStatus, Task, WorkPackage, WorkPackageStatus
+from stellwerk.db import (
+    DecisionOptionRow,
+    DecisionRow,
+    GoalRow,
+    PersonRow,
+    RouteRow,
+    TaskRow,
+    WorkPackageRow,
+)
+from stellwerk.models import (
+    Decision,
+    DecisionOption,
+    Goal,
+    GoalStatus,
+    Person,
+    PersonDirection,
+    PersonRole,
+    Route,
+    Task,
+    WorkPackage,
+    WorkPackageStatus,
+)
 
 
 def _log(log, level: str, message: str, data: dict | None = None) -> None:
@@ -34,6 +54,9 @@ def get_goal(session: Session, goal_id: UUID) -> Goal | None:
     if not row:
         return None
     # relationships are lazy; access to load
+    _ = row.routes
+    _ = row.decisions
+    _ = row.people
     _ = row.tasks
     return row_to_goal(row)
 
@@ -49,6 +72,7 @@ def create_goal(session: Session, title: str, description: str, *, log=None) -> 
         created_at=goal.created_at,
         prologue=goal.prologue,
         rallying_cry=goal.rallying_cry,
+        active_route_id="",
     )
     session.add(row)
     session.commit()
@@ -66,41 +90,161 @@ def apply_plan(session: Session, goal_id: UUID, planned: Goal, *, plan_source: s
     row.prologue = planned.prologue
     row.rallying_cry = planned.rallying_cry
     row.plan_source = (plan_source or "").strip()
+    row.active_route_id = str(planned.active_route_id) if planned.active_route_id else ""
     _log(
         log,
         "info",
-        "DB: apply_plan replacing tasks",
-        {"goal_id": str(goal_id), "tasks": len(planned.tasks), "source": row.plan_source},
+        "DB: apply_plan replacing graph",
+        {
+            "goal_id": str(goal_id),
+            "routes": len(planned.routes),
+            "decisions": len(planned.decisions),
+            "people": len(planned.people),
+            "source": row.plan_source,
+        },
     )
 
-    # Replace tasks/packages
-    session.execute(delete(WorkPackageRow).where(WorkPackageRow.task_id.in_(select(TaskRow.id).where(TaskRow.goal_id == row.id))))
-    session.execute(delete(TaskRow).where(TaskRow.goal_id == row.id))
-
-    for ti, task in enumerate(planned.tasks):
-        trow = TaskRow(
-            id=str(task.id),
-            goal_id=row.id,
-            title=task.title,
-            notes=task.notes,
-            position=ti,
+    # Replace everything under this goal (best-effort, early-stage app)
+    session.execute(
+        delete(WorkPackageRow).where(
+            WorkPackageRow.task_id.in_(select(TaskRow.id).where(TaskRow.goal_id == row.id))
         )
-        session.add(trow)
-        for wi, wp in enumerate(task.work_packages):
-            wprow = WorkPackageRow(
-                id=str(wp.id),
-                task_id=trow.id,
-                title=wp.title,
-                notes=wp.notes,
-                length=max(1, int(wp.length)),
-                grade=max(0, min(10, int(wp.grade))),
-                status=wp.status.value,
-                position=wi,
+    )
+    session.execute(delete(TaskRow).where(TaskRow.goal_id == row.id))
+    session.execute(delete(DecisionOptionRow).where(DecisionOptionRow.decision_id.in_(select(DecisionRow.id).where(DecisionRow.goal_id == row.id))))
+    session.execute(delete(DecisionRow).where(DecisionRow.goal_id == row.id))
+    session.execute(delete(RouteRow).where(RouteRow.goal_id == row.id))
+    session.execute(delete(PersonRow).where(PersonRow.goal_id == row.id))
+
+    # Insert people
+    for pi, p in enumerate(planned.people):
+        session.add(
+            PersonRow(
+                id=str(p.id),
+                goal_id=row.id,
+                name=p.name,
+                role=p.role.value,
+                direction=p.direction.value,
+                notes=p.notes,
+                position=pi,
             )
-            session.add(wprow)
+        )
+
+    # Insert routes + tasks + work packages
+    for ri, route in enumerate(planned.routes):
+        rrow = RouteRow(
+            id=str(route.id),
+            goal_id=row.id,
+            title=route.title,
+            description=route.description,
+            position=ri,
+        )
+        session.add(rrow)
+        for ti, task in enumerate(route.tasks):
+            trow = TaskRow(
+                id=str(task.id),
+                goal_id=row.id,
+                route_id=rrow.id,
+                title=task.title,
+                notes=task.notes,
+                position=ti,
+            )
+            session.add(trow)
+            for wi, wp in enumerate(task.work_packages):
+                session.add(
+                    WorkPackageRow(
+                        id=str(wp.id),
+                        task_id=trow.id,
+                        title=wp.title,
+                        notes=wp.notes,
+                        length=max(1, int(wp.length)),
+                        grade=max(0, min(10, int(wp.grade))),
+                        status=wp.status.value,
+                        position=wi,
+                    )
+                )
+
+    # Insert decisions/options
+    for di, d in enumerate(planned.decisions):
+        drow = DecisionRow(
+            id=str(d.id),
+            goal_id=row.id,
+            title=d.title,
+            prompt=d.prompt,
+            position=di,
+            chosen_option_id=str(d.chosen_option_id) if d.chosen_option_id else "",
+        )
+        session.add(drow)
+        for oi, opt in enumerate(d.options):
+            session.add(
+                DecisionOptionRow(
+                    id=str(opt.id),
+                    decision_id=drow.id,
+                    label=opt.label,
+                    route_id=str(opt.route_id),
+                    position=oi,
+                )
+            )
 
     session.commit()
     _log(log, "info", "DB: apply_plan committed", {"goal_id": str(goal_id)})
+
+
+def choose_decision_option(session: Session, goal_id: UUID, decision_id: UUID, option_id: UUID) -> None:
+    drow = session.get(DecisionRow, str(decision_id))
+    if not drow or drow.goal_id != str(goal_id):
+        return
+    drow.chosen_option_id = str(option_id)
+    session.commit()
+
+
+def add_person(session: Session, goal_id: UUID, *, name: str, role: PersonRole, direction: PersonDirection, notes: str) -> None:
+    goal = session.get(GoalRow, str(goal_id))
+    if not goal:
+        return
+    position = session.execute(select(PersonRow).where(PersonRow.goal_id == str(goal_id)).order_by(PersonRow.position.desc())).scalars().first()
+    next_pos = (position.position + 1) if position else 0
+    p = Person(name=name.strip(), role=role, direction=direction, notes=notes)
+    session.add(
+        PersonRow(
+            id=str(p.id),
+            goal_id=str(goal_id),
+            name=p.name,
+            role=p.role.value,
+            direction=p.direction.value,
+            notes=p.notes,
+            position=next_pos,
+        )
+    )
+    session.commit()
+
+
+def update_person(
+    session: Session,
+    goal_id: UUID,
+    person_id: UUID,
+    *,
+    name: str,
+    role: PersonRole,
+    direction: PersonDirection,
+    notes: str,
+) -> None:
+    row = session.get(PersonRow, str(person_id))
+    if not row or row.goal_id != str(goal_id):
+        return
+    row.name = name.strip() or row.name
+    row.role = role.value
+    row.direction = direction.value
+    row.notes = notes
+    session.commit()
+
+
+def delete_person(session: Session, goal_id: UUID, person_id: UUID) -> None:
+    row = session.get(PersonRow, str(person_id))
+    if not row or row.goal_id != str(goal_id):
+        return
+    session.delete(row)
+    session.commit()
 
 
 def toggle_work_package(session: Session, package_id: UUID, *, log=None) -> None:
@@ -167,21 +311,82 @@ def update_work_package(
 
 
 def row_to_goal(row: GoalRow) -> Goal:
-    tasks: list[Task] = []
-    for t in row.tasks:
-        wps: list[WorkPackage] = []
-        for wp in t.work_packages:
-            wps.append(
-                WorkPackage(
-                    id=UUID(wp.id),
-                    title=wp.title,
-                    notes=wp.notes,
-                    length=wp.length,
-                    grade=wp.grade,
-                    status=WorkPackageStatus(wp.status),
+    people: list[Person] = []
+    for p in getattr(row, "people", []) or []:
+        try:
+            role = PersonRole(p.role)
+        except Exception:
+            role = PersonRole.companion
+        try:
+            direction = PersonDirection(p.direction)
+        except Exception:
+            direction = PersonDirection.with_me
+        people.append(Person(id=UUID(p.id), name=p.name, role=role, direction=direction, notes=p.notes))
+
+    routes: list[Route] = []
+    for r in getattr(row, "routes", []) or []:
+        tasks: list[Task] = []
+        for t in getattr(r, "tasks", []) or []:
+            wps: list[WorkPackage] = []
+            for wp in t.work_packages:
+                wps.append(
+                    WorkPackage(
+                        id=UUID(wp.id),
+                        title=wp.title,
+                        notes=wp.notes,
+                        length=wp.length,
+                        grade=wp.grade,
+                        status=WorkPackageStatus(wp.status),
+                    )
+                )
+            tasks.append(Task(id=UUID(t.id), title=t.title, notes=t.notes, work_packages=wps))
+        routes.append(Route(id=UUID(r.id), title=r.title, description=r.description, tasks=tasks))
+
+    decisions: list[Decision] = []
+    for d in getattr(row, "decisions", []) or []:
+        options: list[DecisionOption] = []
+        for opt in getattr(d, "options", []) or []:
+            options.append(
+                DecisionOption(
+                    id=UUID(opt.id),
+                    label=opt.label,
+                    route_id=UUID(opt.route_id),
                 )
             )
-        tasks.append(Task(id=UUID(t.id), title=t.title, notes=t.notes, work_packages=wps))
+        chosen = None
+        if getattr(d, "chosen_option_id", ""):
+            try:
+                chosen = UUID(d.chosen_option_id)
+            except Exception:
+                chosen = None
+        decisions.append(
+            Decision(
+                id=UUID(d.id),
+                title=d.title,
+                prompt=d.prompt,
+                options=options,
+                chosen_option_id=chosen,
+            )
+        )
+
+    # Legacy compatibility: if there are tasks directly on the goal but no routes yet, wrap into a default route.
+    if not routes and getattr(row, "tasks", None):
+        legacy_tasks: list[Task] = []
+        for t in row.tasks:
+            wps: list[WorkPackage] = []
+            for wp in t.work_packages:
+                wps.append(
+                    WorkPackage(
+                        id=UUID(wp.id),
+                        title=wp.title,
+                        notes=wp.notes,
+                        length=wp.length,
+                        grade=wp.grade,
+                        status=WorkPackageStatus(wp.status),
+                    )
+                )
+            legacy_tasks.append(Task(id=UUID(t.id), title=t.title, notes=t.notes, work_packages=wps))
+        routes = [Route(title="Standardroute", description="(Altbestand)", tasks=legacy_tasks)]
 
     return Goal(
         id=UUID(row.id),
@@ -189,8 +394,11 @@ def row_to_goal(row: GoalRow) -> Goal:
         description=row.description,
         status=GoalStatus(row.status),
         created_at=row.created_at if row.created_at.tzinfo else row.created_at.replace(tzinfo=timezone.utc),
-        tasks=tasks,
+        routes=routes,
+        decisions=decisions,
+        people=people,
         prologue=row.prologue,
         rallying_cry=row.rallying_cry,
         plan_source=getattr(row, "plan_source", "") or "",
+        active_route_id=UUID(row.active_route_id) if getattr(row, "active_route_id", "") else None,
     )

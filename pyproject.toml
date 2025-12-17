@@ -1,6 +1,6 @@
 [project]
 name = "stellwerk"
-version = "0.1.0rc1"
+version = "0.1.0rc2"
 description = "Stellwerk – Ziele, Aufgaben und Arbeitspakete als Zugstrecke planen und verfolgen."
 readme = "README.md"
 requires-python = ">=3.11"

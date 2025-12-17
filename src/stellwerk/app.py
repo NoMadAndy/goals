@@ -14,15 +14,19 @@ from pydantic import BaseModel
 
 from stellwerk.db import create_db_engine, ensure_schema, init_db, open_session
 from stellwerk.debug import debug_log, debug_snapshot, debug_subscribe, debug_unsubscribe, sse_encode
-from stellwerk.models import WorkPackageStatus
+from stellwerk.models import PersonDirection, PersonRole, WorkPackageStatus
 from stellwerk.planner import PlanRequest, openai_plan
 from stellwerk.repository import (
     apply_plan,
+    choose_decision_option,
     create_goal as repo_create_goal,
+    delete_person,
     get_goal as repo_get_goal,
     get_work_package,
     list_goals as repo_list_goals,
+    add_person,
     toggle_work_package,
+    update_person,
     update_work_package,
 )
 from stellwerk.settings import settings
@@ -135,6 +139,8 @@ async def index(request: Request, goal: str | None = None):
         with open_session(engine) as session:
             selected_goal = repo_get_goal(session, selected)
 
+    selected_route = selected_goal.selected_route() if selected_goal else None
+
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -142,6 +148,7 @@ async def index(request: Request, goal: str | None = None):
             "app_title": "Stellwerk",
             "goals": goals,
             "selected_goal": selected_goal,
+            "selected_route": selected_route,
             "persistence": _persistence_label(settings.database_url),
             "debug_enabled": settings.stellwerk_debug,
         },
@@ -192,8 +199,11 @@ async def plan_goal(goal_id: UUID, context: str = Form("")):
         {
             "goal_id": str(goal_id),
             "source": result.source,
-            "tasks": len(result.goal.tasks),
-            "work_packages": sum(len(t.work_packages) for t in result.goal.tasks),
+            "routes": len(result.goal.routes),
+            "decisions": len(result.goal.decisions),
+            "people": len(result.goal.people),
+            "tasks": sum(len(r.tasks) for r in result.goal.routes),
+            "work_packages": sum(len(t.work_packages) for r in result.goal.routes for t in r.tasks),
         },
     )
 
@@ -205,6 +215,92 @@ async def toggle_package(goal_id: UUID, package_id: UUID):
     with open_session(engine) as session:
         toggle_work_package(session, package_id)
     await _dbg("info", "WorkPackage: toggled", {"goal_id": str(goal_id), "package_id": str(package_id)})
+    return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
+
+
+@app.post("/goals/{goal_id}/decisions/{decision_id}/options/{option_id}/choose")
+async def choose_option(goal_id: UUID, decision_id: UUID, option_id: UUID):
+    with open_session(engine) as session:
+        choose_decision_option(session, goal_id, decision_id, option_id)
+    await _dbg(
+        "info",
+        "Decision: chosen",
+        {"goal_id": str(goal_id), "decision_id": str(decision_id), "option_id": str(option_id)},
+    )
+    return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
+
+
+@app.post("/goals/{goal_id}/people/add")
+async def people_add(
+    goal_id: UUID,
+    name: str = Form(""),
+    role: str = Form("companion"),
+    direction: str = Form("with_me"),
+    notes: str = Form(""),
+):
+    name = name.strip()
+    if not name:
+        return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
+    try:
+        role_enum = PersonRole(role)
+    except Exception:
+        role_enum = PersonRole.companion
+    try:
+        direction_enum = PersonDirection(direction)
+    except Exception:
+        direction_enum = PersonDirection.with_me
+
+    with open_session(engine) as session:
+        add_person(session, goal_id, name=name, role=role_enum, direction=direction_enum, notes=notes)
+    await _dbg(
+        "info",
+        "People: added",
+        {"goal_id": str(goal_id), "name": name, "role": role_enum.value, "direction": direction_enum.value},
+    )
+    return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
+
+
+@app.post("/goals/{goal_id}/people/{person_id}/update")
+async def people_update(
+    goal_id: UUID,
+    person_id: UUID,
+    name: str = Form(""),
+    role: str = Form("companion"),
+    direction: str = Form("with_me"),
+    notes: str = Form(""),
+):
+    try:
+        role_enum = PersonRole(role)
+    except Exception:
+        role_enum = PersonRole.companion
+    try:
+        direction_enum = PersonDirection(direction)
+    except Exception:
+        direction_enum = PersonDirection.with_me
+
+    with open_session(engine) as session:
+        update_person(
+            session,
+            goal_id,
+            person_id,
+            name=name,
+            role=role_enum,
+            direction=direction_enum,
+            notes=notes,
+        )
+    await _dbg(
+        "info",
+        "People: updated",
+        {"goal_id": str(goal_id), "person_id": str(person_id), "role": role_enum.value, "direction": direction_enum.value},
+    )
+    return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
+
+
+@app.post("/goals/{goal_id}/people/{person_id}/delete")
+async def people_delete(goal_id: UUID, person_id: UUID):
+    with open_session(engine) as session:
+        delete_person(session, goal_id, person_id)
+    await _dbg("info", "People: deleted", {"goal_id": str(goal_id), "person_id": str(person_id)})
     return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
 
 
