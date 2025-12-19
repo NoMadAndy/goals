@@ -1,12 +1,12 @@
 # Stellwerk
 
-KI-gestütztes Tool, um Ziele zu setzen, Aufgaben zu definieren und diese in Arbeitspakete zu zerlegen – visualisiert als Zugstrecke mit Lok und Waggons.
+KI-gestütztes Tool, um Ziele zu setzen, Aufgaben zu definieren und diese in Arbeitspakete zu zerlegen – visualisiert als Liniengraph mit Abschnitten und Abzweigen.
 
 ## Features (MVP)
 
 - Ziele anlegen (Dev: SQLite, Preprod/Prod: Postgres)
-- KI/Heuristik plant: Zielbeschreibung + Aufgaben + Arbeitspakete
-- Zugstrecke (SVG) zeigt **Länge** (Aufwand) und **Steigung** (Schwierigkeit)
+- KI plant: Zielbeschreibung + Aufgaben + Arbeitspakete
+- Liniengraph (SVG) zeigt Abschnitte/Abzweige und Fortschritt über erledigte Arbeitspakete
 - Responsive UI: Desktop ausführlich, Mobil nur das Nötigste
 
 ## Setup
@@ -25,6 +25,18 @@ pip install -e ".[dev]"
 ```
 
 Dann öffnen: http://127.0.0.1:8000
+Dann öffnen: http://127.0.0.1:8002
+
+## Server-Konfiguration (TOML)
+
+Optional kannst du Server-Settings über eine TOML-Datei konfigurieren.
+
+- Standardpfad: `./stellwerk.toml` (wenn vorhanden)
+- Alternativ: `stellwerk --config pfad/zur/datei.toml`
+
+`./scripts/dev.sh` berücksichtigt optional `STELLWERK_CONFIG` (Pfad zur TOML-Datei).
+
+Beispiel: siehe `stellwerk.example.toml`.
 
 ## Tests
 
@@ -42,5 +54,6 @@ Optional über `.env` (siehe `.env.example`):
 
 - `DATABASE_URL` (Default: `sqlite+pysqlite:///./data/stellwerk.db`)
 - `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`
+- optional: `OPENAI_TIMEOUT_SECONDS`, `OPENAI_RETRIES`
 
-Ohne `OPENAI_API_KEY` nutzt Stellwerk automatisch einen deterministischen Heuristik-Planer.
+Ohne `OPENAI_API_KEY` kann Stellwerk keine Pläne erstellen (es gibt keinen Heuristik-Fallback).

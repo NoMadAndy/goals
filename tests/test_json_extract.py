@@ -17,7 +17,7 @@ def test_extract_json_object_fenced():
 
 
 def test_extract_json_object_with_extra_text():
-    obj = _extract_json_object("Here you go:\n{\n  \"k\": \"v\"\n}\nThanks!")
+    obj = _extract_json_object('Here you go:\n{\n  "k": "v"\n}\nThanks!')
     assert obj["k"] == "v"
 
 

@@ -1,0 +1,10 @@
+# Beispiel-Konfiguration für Stellwerk
+#
+# Diese Datei kann als ./stellwerk.toml abgelegt werden oder via
+#   stellwerk --config stellwerk.example.toml
+# genutzt werden.
+
+[server]
+host = "127.0.0.1"
+port = 8002
+reload = true

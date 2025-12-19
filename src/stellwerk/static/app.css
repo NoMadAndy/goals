@@ -103,7 +103,7 @@ button:hover{filter:brightness(1.05)}
 .track{
   width:100%;
   min-width:860px;
-  height:260px;
+  height:280px;
   display:block;
   shape-rendering: geometricPrecision;
   text-rendering: geometricPrecision;
@@ -152,6 +152,13 @@ button:hover{filter:brightness(1.05)}
 
 .plan-source{margin-top:10px; color: var(--muted); font-size: 12px}
 
+.alert{
+  border: 1px solid rgba(51,214,255,.35);
+  background: rgba(51,214,255,.08);
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
 .route-choices{display:flex; gap:10px; flex-wrap:wrap}
 .route-choice{
   background: rgba(255,255,255,.06);
@@ -165,11 +172,62 @@ button:hover{filter:brightness(1.05)}
 
 .rail.active{stroke: rgba(51,214,255,.65)}
 
+/* Line Graph (new visualization) */
+.graph-line{stroke: rgba(255,255,255,.26); stroke-width:6; stroke-linecap:round; vector-effect: non-scaling-stroke}
+.graph-line.active{stroke: rgba(51,214,255,.65)}
+.graph-line.missing{stroke-dasharray: 8 8; opacity:.45}
+
+.graph-branch{stroke: rgba(255,255,255,.18); stroke-width:4; stroke-linecap:round; vector-effect: non-scaling-stroke; opacity:.75}
+.graph-branch.active{stroke: rgba(51,214,255,.55); opacity:1}
+.graph-branch.chosen{stroke: rgba(51,214,255,.55); opacity:1}
+
+.graph-done{stroke: rgba(46,229,157,.75); stroke-width:6; stroke-linecap:round; vector-effect: non-scaling-stroke}
+.graph-done.active{stroke: rgba(46,229,157,.9)}
+
+.graph-node{fill: rgba(255,255,255,.16); stroke: rgba(255,255,255,.18); stroke-width:2}
+
+.graph-label{font-size:12px; fill: rgba(255,255,255,.88)}
+.graph-branch-label{font-size:11px; fill: rgba(255,255,255,.70)}
+.graph-phase{font-size:11px; fill: rgba(255,255,255,.60)}
+
+/* Toasts (Plan progress) */
+.toast-container{
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  z-index: 50;
+  display:flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(420px, calc(100vw - 24px));
+}
+.toast{
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(5,8,16,.78);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.toast.info{border-color: rgba(51,214,255,.28)}
+.toast.warn{border-color: rgba(255,255,255,.18)}
+.toast.error{border-color: rgba(255,255,255,.26)}
+.toast-msg{font-weight: 800; color: rgba(255,255,255,.92)}
+.toast-meta{margin-top:4px; font-size: 12px; color: var(--muted)}
+.toast.hide{opacity: 0; transform: translateY(-4px); transition: opacity .2s ease, transform .2s ease}
+
+@media (max-width: 900px){
+  .toast-container{right: 10px; left: 10px; width: auto}
+}
+
 /* Debug Console */
 .debug-console{
-  position: static;
-  max-width: 1200px;
-  margin: 18px auto;
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  right: auto;
+  z-index: 50;
+  width: min(520px, calc(100vw - 24px));
+  margin: 0;
   border: 1px solid rgba(255,255,255,.14);
   border-radius: 16px;
   background: rgba(5,8,16,.72);
@@ -215,5 +273,5 @@ button:hover{filter:brightness(1.05)}
   .row-right{flex-direction:column; align-items:stretch}
   .grid2{grid-template-columns: 1fr}
   .track{min-width: 720px}
-  .debug-console{margin: 12px 18px 18px 18px}
+  .debug-console{left: 10px; right: 10px; top: 10px; width: auto}
 }

@@ -23,4 +23,4 @@ docker compose -f docker-compose.prod.yml up -d
 echo "[prod] health check"
 docker compose -f docker-compose.prod.yml ps
 
-echo "[prod] done: open http://<host>:8000"
+echo "[prod] done: open http://<host>:8002"

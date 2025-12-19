@@ -59,7 +59,7 @@
             <p class="prologue">{{ selected_goal.prologue or "" }}</p>
             <p class="muted">{{ selected_goal.description }}</p>
             {% if selected_goal.plan_source %}
-              <div class="plan-source">Planquelle: <span class="pill">{{ "OpenAI" if selected_goal.plan_source == "openai" else "Heuristik" }}</span></div>
+              <div class="plan-source">Planquelle: <span class="pill">{{ "OpenAI" if selected_goal.plan_source == "openai" else "Altbestand" }}</span></div>
             {% endif %}
             {% if selected_goal.rallying_cry %}
               <div class="rally">{{ selected_goal.rallying_cry }}</div>
@@ -75,10 +75,21 @@
               </form>
             </div>
 
+            {% if plan_error %}
+              <div class="alert" style="margin-top:12px">
+                <div style="font-weight:800">Plan konnte nicht erstellt werden.</div>
+                <div class="muted" style="margin-top:4px">{{ plan_error }}</div>
+                <div class="muted" style="margin-top:6px">Hinweis: Für Planung wird `OPENAI_API_KEY` benötigt.</div>
+              </div>
+            {% endif %}
+
             {% if selected_goal.people|length > 0 or true %}
-              <div class="people card" style="margin-top:12px">
-                <h3>Begleiter & Helfer</h3>
-                <div class="muted" style="margin-bottom:10px">
+              <details class="people card" style="margin-top:12px">
+                <summary style="cursor:pointer">
+                  <h3 style="display:inline; margin:0">Begleiter & Helfer</h3>
+                </summary>
+
+                <div class="muted" style="margin:10px 0">
                   Begleiter ziehen mit dir. Helfer sind Personen, bei denen du vorangehst oder die dich aus anderer Perspektive stärken.
                 </div>
 
@@ -144,56 +155,77 @@
                   <textarea name="notes" placeholder="Kontext, Erwartungen, Zusammenarbeit…"></textarea>
                   <button type="submit">Person hinzufügen</button>
                 </form>
-              </div>
+              </details>
             {% endif %}
 
             {% if selected_goal.decisions|length > 0 %}
-              {% set d = selected_goal.decisions[0] %}
-              <div class="card" style="margin-top:12px">
-                <h3>{{ d.title }}</h3>
-                <div class="muted" style="margin-bottom:10px">{{ d.prompt }}</div>
-                <div class="route-choices">
-                  {% for opt in d.options %}
-                    <form method="post" action="/goals/{{ selected_goal.id }}/decisions/{{ d.id }}/options/{{ opt.id }}/choose">
-                      <button type="submit" class="route-choice {% if d.chosen_option_id and opt.id == d.chosen_option_id %}active{% endif %}">
-                        {{ opt.label }}
-                      </button>
-                    </form>
-                  {% endfor %}
+              {% for d in selected_goal.decisions|sort(attribute='phase') %}
+                <div class="card" style="margin-top:12px">
+                  <div class="row">
+                    <h3 style="margin:0">{{ d.title }}</h3>
+                    <span class="pill">Phase {{ (d.phase or 0) + 1 }}</span>
+                  </div>
+                  {% if d.prompt %}
+                    <div class="muted" style="margin:10px 0">{{ d.prompt }}</div>
+                  {% endif %}
+                  <div class="route-choices">
+                    {% for opt in d.options %}
+                      <form method="post" action="/goals/{{ selected_goal.id }}/decisions/{{ d.id }}/options/{{ opt.id }}/choose">
+                        <button type="submit" class="route-choice {% if d.chosen_option_id and opt.id == d.chosen_option_id %}active{% endif %}">
+                          {{ opt.label }}
+                        </button>
+                      </form>
+                    {% endfor %}
+                  </div>
                 </div>
-              </div>
+              {% endfor %}
             {% endif %}
 
             {% include "track.html" %}
           </section>
 
           <section class="card details">
-            <h2>Arbeitspakete{% if selected_route %} · {{ selected_route.title }}{% endif %}</h2>
-            {% if not selected_route or selected_route.tasks|length == 0 %}
+            <h2>Arbeitspakete · Aktiver Pfad</h2>
+            {% if path_routes|length == 0 %}
               <div class="muted">Noch keine Aufgaben. Klicke auf „KI: Plan erstellen“.</div>
             {% endif %}
 
-            {% if selected_route %}
-              {% for t in selected_route.tasks %}
-                <div class="task">
-                  <div class="task-title">{{ t.title }}</div>
-                  {% if t.notes %}<div class="muted" style="margin-bottom:10px">{{ t.notes }}</div>{% endif %}
-                  <div class="packages">
-                    {% for wp in t.work_packages %}
-                      <div class="package">
-                        <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
-                          <button type="submit" class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
-                            <div class="package-title">{{ wp.title }}</div>
-                            <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10</div>
-                          </button>
-                        </form>
-                        <a class="package-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Details</a>
-                      </div>
-                    {% endfor %}
+            {% for r in path_routes %}
+              <div class="task" style="border-top:none; padding-top:0; margin-top:0">
+                <div class="row" style="margin: 18px 0 10px 0">
+                  <div class="task-title" style="margin:0">{{ r.title }}</div>
+                  <div class="row-right">
+                    <span class="pill">Phase {{ (r.phase or 0) + 1 }}</span>
+                    <span class="pill">{{ "Abschnitt" if r.kind.value == 'trunk' else "Abzweig" }}</span>
                   </div>
                 </div>
-              {% endfor %}
-            {% endif %}
+                {% if r.description %}<div class="muted" style="margin-bottom:10px">{{ r.description }}</div>{% endif %}
+
+                {% if r.tasks|length == 0 %}
+                  <div class="muted">Noch keine Aufgaben in diesem Abschnitt.</div>
+                {% endif %}
+
+                {% for t in r.tasks %}
+                  <div class="task">
+                    <div class="task-title">{{ t.title }}</div>
+                    {% if t.notes %}<div class="muted" style="margin-bottom:10px">{{ t.notes }}</div>{% endif %}
+                    <div class="packages">
+                      {% for wp in t.work_packages %}
+                        <div class="package">
+                          <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
+                            <button type="submit" class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
+                              <div class="package-title">{{ wp.title }}</div>
+                              <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10</div>
+                            </button>
+                          </form>
+                          <a class="package-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Details</a>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
           </section>
         {% endif %}
       </section>
@@ -204,5 +236,8 @@
     </footer>
 
     {% include "debug_console.html" %}
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+    <script src="/static/toast.js"></script>
   </body>
 </html>

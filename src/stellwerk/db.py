@@ -52,6 +52,12 @@ class GoalRow(Base):
         cascade="all, delete-orphan",
         order_by="DecisionRow.position",
     )
+    edges: Mapped[list["RouteEdgeRow"]] = relationship(
+        "RouteEdgeRow",
+        back_populates="goal",
+        cascade="all, delete-orphan",
+        order_by="RouteEdgeRow.position",
+    )
     people: Mapped[list["PersonRow"]] = relationship(
         "PersonRow",
         back_populates="goal",
@@ -67,6 +73,8 @@ class RouteRow(Base):
     goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="trunk")
+    phase: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     goal: Mapped["GoalRow"] = relationship("GoalRow", back_populates="routes")
@@ -85,6 +93,10 @@ class DecisionRow(Base):
     goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    from_route_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("routes.id", ondelete="CASCADE"), nullable=False, default=""
+    )
+    phase: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     chosen_option_id: Mapped[str] = mapped_column(String(36), nullable=False, default="")
 
@@ -101,12 +113,30 @@ class DecisionOptionRow(Base):
     __tablename__ = "decision_options"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    decision_id: Mapped[str] = mapped_column(String(36), ForeignKey("decisions.id", ondelete="CASCADE"))
+    decision_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("decisions.id", ondelete="CASCADE")
+    )
     label: Mapped[str] = mapped_column(String(240), nullable=False)
     route_id: Mapped[str] = mapped_column(String(36), ForeignKey("routes.id", ondelete="CASCADE"))
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     decision: Mapped["DecisionRow"] = relationship("DecisionRow", back_populates="options")
+
+
+class RouteEdgeRow(Base):
+    __tablename__ = "route_edges"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"))
+    from_route_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("routes.id", ondelete="CASCADE")
+    )
+    to_route_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("routes.id", ondelete="CASCADE")
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    goal: Mapped["GoalRow"] = relationship("GoalRow", back_populates="edges")
 
 
 class PersonRow(Base):
@@ -129,7 +159,9 @@ class TaskRow(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     goal_id: Mapped[str] = mapped_column(String(36), ForeignKey("goals.id", ondelete="CASCADE"))
-    route_id: Mapped[str] = mapped_column(String(36), ForeignKey("routes.id", ondelete="CASCADE"), nullable=False, default="")
+    route_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("routes.id", ondelete="CASCADE"), nullable=False, default=""
+    )
 
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -187,7 +219,9 @@ def ensure_schema(engine: Engine) -> None:
         if url.startswith("sqlite"):
             cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(goals)").fetchall()]
             if "plan_source" not in cols:
-                conn.exec_driver_sql("ALTER TABLE goals ADD COLUMN plan_source VARCHAR(32) NOT NULL DEFAULT ''")
+                conn.exec_driver_sql(
+                    "ALTER TABLE goals ADD COLUMN plan_source VARCHAR(32) NOT NULL DEFAULT ''"
+                )
             if "active_route_id" not in cols:
                 conn.exec_driver_sql(
                     "ALTER TABLE goals ADD COLUMN active_route_id VARCHAR(36) NOT NULL DEFAULT ''"
@@ -195,10 +229,36 @@ def ensure_schema(engine: Engine) -> None:
 
             task_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(tasks)").fetchall()]
             if "route_id" not in task_cols:
-                conn.exec_driver_sql("ALTER TABLE tasks ADD COLUMN route_id VARCHAR(36) NOT NULL DEFAULT ''")
+                conn.exec_driver_sql(
+                    "ALTER TABLE tasks ADD COLUMN route_id VARCHAR(36) NOT NULL DEFAULT ''"
+                )
 
             # New tables (create_all won't alter existing DBs, but will create missing tables)
             Base.metadata.create_all(bind=conn)
+
+            route_cols = [
+                r[1] for r in conn.exec_driver_sql("PRAGMA table_info(routes)").fetchall()
+            ]
+            if "kind" not in route_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE routes ADD COLUMN kind VARCHAR(16) NOT NULL DEFAULT 'trunk'"
+                )
+            if "phase" not in route_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE routes ADD COLUMN phase INTEGER NOT NULL DEFAULT 0"
+                )
+
+            decision_cols = [
+                r[1] for r in conn.exec_driver_sql("PRAGMA table_info(decisions)").fetchall()
+            ]
+            if "phase" not in decision_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE decisions ADD COLUMN phase INTEGER NOT NULL DEFAULT 0"
+                )
+            if "from_route_id" not in decision_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE decisions ADD COLUMN from_route_id VARCHAR(36) NOT NULL DEFAULT ''"
+                )
         elif url.startswith("postgres"):
             # Add column if missing
             exists = conn.exec_driver_sql(
@@ -209,7 +269,9 @@ def ensure_schema(engine: Engine) -> None:
                 """
             ).fetchone()
             if not exists:
-                conn.exec_driver_sql("ALTER TABLE goals ADD COLUMN plan_source VARCHAR(32) NOT NULL DEFAULT ''")
+                conn.exec_driver_sql(
+                    "ALTER TABLE goals ADD COLUMN plan_source VARCHAR(32) NOT NULL DEFAULT ''"
+                )
 
             exists = conn.exec_driver_sql(
                 """
@@ -236,6 +298,54 @@ def ensure_schema(engine: Engine) -> None:
                 )
 
             Base.metadata.create_all(bind=conn)
+
+            exists = conn.exec_driver_sql(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='routes' AND column_name='kind'
+                """
+            ).fetchone()
+            if not exists:
+                conn.exec_driver_sql(
+                    "ALTER TABLE routes ADD COLUMN kind VARCHAR(16) NOT NULL DEFAULT 'trunk'"
+                )
+
+            exists = conn.exec_driver_sql(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='routes' AND column_name='phase'
+                """
+            ).fetchone()
+            if not exists:
+                conn.exec_driver_sql(
+                    "ALTER TABLE routes ADD COLUMN phase INTEGER NOT NULL DEFAULT 0"
+                )
+
+            exists = conn.exec_driver_sql(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='decisions' AND column_name='phase'
+                """
+            ).fetchone()
+            if not exists:
+                conn.exec_driver_sql(
+                    "ALTER TABLE decisions ADD COLUMN phase INTEGER NOT NULL DEFAULT 0"
+                )
+
+            exists = conn.exec_driver_sql(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='decisions' AND column_name='from_route_id'
+                """
+            ).fetchone()
+            if not exists:
+                conn.exec_driver_sql(
+                    "ALTER TABLE decisions ADD COLUMN from_route_id VARCHAR(36) NOT NULL DEFAULT ''"
+                )
 
 
 def open_session(engine: Engine) -> Session:

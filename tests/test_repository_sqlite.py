@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine
 
 from stellwerk.db import init_db, open_session
-from stellwerk.planner import PlanRequest, heuristic_plan
 from stellwerk.repository import (
     apply_plan,
     create_goal,
@@ -10,7 +9,31 @@ from stellwerk.repository import (
     toggle_work_package,
     update_work_package,
 )
-from stellwerk.models import WorkPackageStatus
+from stellwerk.models import Goal, Route, Task, WorkPackage, WorkPackageStatus
+
+
+def _sample_goal() -> Goal:
+    route = Route(
+        title="Standard",
+        description="",
+        tasks=[
+            Task(
+                title="Aufgabe 1",
+                notes="",
+                work_packages=[WorkPackage(title="WP 1", notes="", length=2, grade=3)],
+            )
+        ],
+    )
+    return Goal(
+        title="Mehr Sport",
+        description="",
+        routes=[route],
+        decisions=[],
+        people=[],
+        active_route_id=route.id,
+        prologue="",
+        rallying_cry="",
+    )
 
 
 def test_repository_roundtrip_sqlite():
@@ -25,7 +48,7 @@ def test_repository_roundtrip_sqlite():
         assert len(goals) == 1
         assert goals[0].id == goal_id
 
-    planned = heuristic_plan(PlanRequest(raw_goal="Mehr Sport", context="3x pro Woche"))
+    planned = _sample_goal()
 
     with open_session(engine) as session:
         apply_plan(session, goal_id, planned)
@@ -35,7 +58,7 @@ def test_repository_roundtrip_sqlite():
         assert goal is not None
         route = goal.selected_route()
         assert route is not None
-        assert len(route.tasks) >= 5
+        assert len(route.tasks) >= 1
         first_wp = route.tasks[0].work_packages[0]
 
     with open_session(engine) as session:
@@ -57,7 +80,7 @@ def test_update_work_package_persists_notes_and_status():
     with open_session(engine) as session:
         goal_id = create_goal(session, title="Ziel", description="")
 
-    planned = heuristic_plan(PlanRequest(raw_goal="Ziel"))
+    planned = _sample_goal()
     with open_session(engine) as session:
         apply_plan(session, goal_id, planned)
 

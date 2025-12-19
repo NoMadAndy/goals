@@ -24,6 +24,6 @@ RUN python -m pip install -U pip \
 # Database URL is provided via environment (docker-compose)
 ENV DATABASE_URL=
 
-EXPOSE 8000
+EXPOSE 8002
 
-CMD ["uvicorn", "stellwerk.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "stellwerk.app:app", "--host", "0.0.0.0", "--port", "8002"]

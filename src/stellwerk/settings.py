@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
 
+    # Network robustness for OpenAI calls
+    # Total timeout in seconds (primarily affects read timeout for chat completions)
+    openai_timeout_seconds: float = 60.0
+    # Number of retries for transient failures (timeouts, 429, 5xx)
+    openai_retries: int = 2
+
     @field_validator("database_url", mode="before")
     @classmethod
     def _database_url_blank_to_default(cls, v):
@@ -30,7 +36,7 @@ class Settings(BaseSettings):
             s = v.strip()
             if not s:
                 return _DEFAULT_DATABASE_URL
-            if len(s) >= 2 and s[0] == s[-1] and s[0] in {"\"", "'"}:
+            if len(s) >= 2 and s[0] == s[-1] and s[0] in {'"', "'"}:
                 s = s[1:-1].strip()
             return s
         return v

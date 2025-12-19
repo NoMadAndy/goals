@@ -12,7 +12,7 @@ Dieses Repository macht **keine Annahmen** über Cloud/Provider. Stattdessen gib
 ### Voraussetzungen
 
 - Host mit `docker` und `docker compose` (Plugin)
-- Port `8000` erreichbar (oder via Reverse Proxy)
+- Port `8002` erreichbar (oder via Reverse Proxy)
 
 ### Setup
 
@@ -62,4 +62,4 @@ Rollback ist hier bewusst simpel gehalten:
 
 ## Reverse Proxy (optional)
 
-Wenn du TLS/Domain willst, setze einen Reverse Proxy (z. B. Caddy/Nginx/Traefik) vor `http://127.0.0.1:8000`.
+Wenn du TLS/Domain willst, setze einen Reverse Proxy (z. B. Caddy/Nginx/Traefik) vor `http://127.0.0.1:8002`.

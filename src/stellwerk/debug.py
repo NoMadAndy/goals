@@ -80,7 +80,9 @@ def _sanitize_data(data: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 async def debug_log(level: str, message: str, data: dict[str, Any] | None = None) -> None:
-    await _bus.publish(DebugEvent(ts=time.time(), level=level, message=message, data=_sanitize_data(data)))
+    await _bus.publish(
+        DebugEvent(ts=time.time(), level=level, message=message, data=_sanitize_data(data))
+    )
 
 
 async def debug_snapshot() -> list[dict[str, Any]]:

@@ -26,4 +26,4 @@ echo "[preprod] health check"
 
 docker compose -f docker-compose.preprod.yml ps
 
-echo "[preprod] done: open http://<host>:8000"
+echo "[preprod] done: open http://<host>:8002"
