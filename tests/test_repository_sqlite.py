@@ -113,3 +113,40 @@ def test_update_work_package_persists_notes_and_status():
         assert wp2.length == 3
         assert wp2.grade == 7
         assert wp2.status.value == "diverted"
+
+
+def test_apply_plan_skips_decision_with_missing_route_fk():
+    engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
+    with engine.begin() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+    init_db(engine)
+
+    with open_session(engine) as session:
+        goal_id = create_goal(session, title="Ziel", description="")
+
+    route = Route(title="Abschnitt", description="", tasks=[])
+    planned = Goal(title="Ziel", description="", routes=[route], decisions=[], people=[])
+
+    # Craft an inconsistent decision referencing a non-existent route id.
+    from uuid import uuid4
+
+    from stellwerk.models import Decision, DecisionOption
+
+    planned.decisions = [
+        Decision(
+            title="Weiche",
+            prompt="?",
+            from_route_id=uuid4(),
+            options=[DecisionOption(label="A", route_id=route.id)],
+        )
+    ]
+
+    with open_session(engine) as session:
+        apply_plan(session, goal_id, planned)
+
+    with open_session(engine) as session:
+        goal = get_goal(session, goal_id)
+        assert goal is not None
+        assert len(goal.routes) == 1
+        # Decision should have been skipped rather than violating FK.
+        assert len(goal.decisions) == 0

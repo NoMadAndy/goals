@@ -96,7 +96,17 @@ def apply_plan(
     row.prologue = planned.prologue
     row.rallying_cry = planned.rallying_cry
     row.plan_source = (plan_source or "").strip()
-    row.active_route_id = str(planned.active_route_id) if planned.active_route_id else ""
+    route_ids: set[str] = {str(r.id) for r in getattr(planned, "routes", []) or []}
+    active_route_id = str(planned.active_route_id) if planned.active_route_id else ""
+    if active_route_id and active_route_id not in route_ids:
+        _log(
+            log,
+            "warn",
+            "DB: apply_plan active_route_id not in routes; resetting",
+            {"goal_id": str(goal_id), "active_route_id": active_route_id},
+        )
+        active_route_id = ""
+    row.active_route_id = active_route_id
     _log(
         log,
         "info",
@@ -180,19 +190,52 @@ def apply_plan(
                 )
 
     # Insert decisions/options
-    for di, d in enumerate(planned.decisions):
+    decision_position = 0
+    for d in planned.decisions:
+        raw_from = getattr(d, "from_route_id", None)
+        from_route_id = str(raw_from) if raw_from else ""
+
+        if not from_route_id or from_route_id not in route_ids:
+            _log(
+                log,
+                "warn",
+                "DB: apply_plan skipping decision with missing from_route_id",
+                {
+                    "goal_id": str(goal_id),
+                    "decision_id": str(d.id),
+                    "from_route_id": from_route_id,
+                },
+            )
+            continue
+
+        valid_opts = [
+            opt for opt in (getattr(d, "options", []) or []) if str(opt.route_id) in route_ids
+        ]
+        if not valid_opts:
+            _log(
+                log,
+                "warn",
+                "DB: apply_plan skipping decision with no valid options",
+                {"goal_id": str(goal_id), "decision_id": str(d.id)},
+            )
+            continue
+
+        chosen_option_id = str(getattr(d, "chosen_option_id", "") or "")
+        if chosen_option_id and all(str(opt.id) != chosen_option_id for opt in valid_opts):
+            chosen_option_id = ""
+
         drow = DecisionRow(
             id=str(d.id),
             goal_id=row.id,
             title=d.title,
             prompt=d.prompt,
-            from_route_id=str(d.from_route_id) if getattr(d, "from_route_id", None) else None,
+            from_route_id=from_route_id,
             phase=int(getattr(d, "phase", 0)),
-            position=di,
-            chosen_option_id=str(d.chosen_option_id) if d.chosen_option_id else "",
+            position=decision_position,
+            chosen_option_id=chosen_option_id,
         )
         session.add(drow)
-        for oi, opt in enumerate(d.options):
+        for oi, opt in enumerate(valid_opts):
             session.add(
                 DecisionOptionRow(
                     id=str(opt.id),
@@ -202,18 +245,36 @@ def apply_plan(
                     position=oi,
                 )
             )
+        decision_position += 1
 
     # Insert edges (DAG)
-    for ei, e in enumerate(getattr(planned, "edges", []) or []):
+    edge_position = 0
+    for e in getattr(planned, "edges", []) or []:
+        from_id = str(e.from_route_id)
+        to_id = str(e.to_route_id)
+        if from_id not in route_ids or to_id not in route_ids:
+            _log(
+                log,
+                "warn",
+                "DB: apply_plan skipping edge with missing route",
+                {
+                    "goal_id": str(goal_id),
+                    "edge_id": str(e.id),
+                    "from_route_id": from_id,
+                    "to_route_id": to_id,
+                },
+            )
+            continue
         session.add(
             RouteEdgeRow(
                 id=str(e.id),
                 goal_id=row.id,
-                from_route_id=str(e.from_route_id),
-                to_route_id=str(e.to_route_id),
-                position=ei,
+                from_route_id=from_id,
+                to_route_id=to_id,
+                position=edge_position,
             )
         )
+        edge_position += 1
 
     session.commit()
     _log(log, "info", "DB: apply_plan committed", {"goal_id": str(goal_id)})
