@@ -189,6 +189,10 @@ def apply_plan(
                     )
                 )
 
+    # Important for Postgres FK constraints:
+    # Ensure routes exist in the DB before inserting decisions/options that FK to routes.
+    session.flush()
+
     # Insert decisions/options
     decision_position = 0
     for d in planned.decisions:
@@ -246,6 +250,9 @@ def apply_plan(
                 )
             )
         decision_position += 1
+
+    # Ensure decisions exist before options/edges dependent on them (best-effort ordering)
+    session.flush()
 
     # Insert edges (DAG)
     edge_position = 0
