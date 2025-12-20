@@ -10,10 +10,10 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <div class="logo">⚙</div>
+        <div class="logo">🎯</div>
         <div>
-          <div class="title">Stellwerk</div>
-          <div class="subtitle">Weichen stellen. Strecke fahren. Ziele erreichen.</div>
+          <div class="title">Goals</div>
+          <div class="subtitle">Ziele planen. Arbeitspakete umsetzen.</div>
         </div>
       </div>
     </header>
@@ -53,7 +53,7 @@
       <section class="content">
         {% if not selected_goal %}
           <section class="card hero">
-            <h1>Willkommen im Stellwerk</h1>
+            <h1>Willkommen bei Goals</h1>
             <p>
               Du stellst nicht eine große Weiche, sondern viele kleine.
               Lege ein Ziel an, dann lass dir Aufgaben und Arbeitspakete planen.
@@ -74,10 +74,10 @@
 
           <section class="card">
             <div class="row">
-              <h2>Plan</h2>
+              <h2>🧠 Plan</h2>
               <form method="post" action="/goals/{{ selected_goal.id }}/plan" class="row-right">
                 <input name="context" placeholder="Optionaler Kontext (Zeit, Ressourcen, Constraints)…" />
-                <button type="submit">KI: Plan erstellen</button>
+                <button type="submit">✨ KI: Plan erstellen</button>
               </form>
             </div>
 
@@ -190,7 +190,7 @@
           </section>
 
           <section class="card details">
-            <h2>Arbeitspakete · Aktiver Pfad</h2>
+            <h2>🧩 Arbeitspakete · Aktiver Pfad</h2>
             {% if path_routes|length == 0 %}
               <div class="muted">Noch keine Aufgaben. Klicke auf „KI: Plan erstellen“.</div>
             {% endif %}
@@ -332,7 +332,7 @@
     </main>
 
     <footer class="footer">
-      <span class="muted">Stellwerk · Persistenz: {{ persistence }}</span>
+      <span class="muted">Goals · Persistenz: {{ persistence }}</span>
     </footer>
 
     {% include "debug_console.html" %}

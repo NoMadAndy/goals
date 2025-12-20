@@ -79,7 +79,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Stellwerk", lifespan=lifespan)
+app = FastAPI(title="Goals", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -166,7 +166,7 @@ async def index(request: Request, goal: str | None = None, plan_error: str | Non
         request,
         "index.html",
         {
-            "app_title": "Stellwerk",
+            "app_title": "Goals",
             "goals": goals,
             "selected_goal": selected_goal,
             "selected_route": selected_route,
