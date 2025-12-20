@@ -57,3 +57,17 @@ Optional über `.env` (siehe `.env.example`):
 - optional: `OPENAI_TIMEOUT_SECONDS`, `OPENAI_RETRIES`
 
 Ohne `OPENAI_API_KEY` kann Stellwerk keine Pläne erstellen (es gibt keinen Heuristik-Fallback).
+
+## 📚 Projekt Enhancement Dokumentation
+
+Umfassende Dokumentation zur Verbesserung des Projekts mit besserer Organisation und intelligenterer KI-Logik:
+
+**[→ Zur Dokumentation (DOKUMENTATION_INDEX.md)](./DOKUMENTATION_INDEX.md)** - Start hier!
+
+Die Dokumentation enthält:
+- ✅ Umfassender Prompt für Stellwerk 2.0 (34 KB)
+- ✅ Inkrementeller Refactoring-Guide (29 KB)
+- ✅ Architektur-Diagramme und Vergleiche
+- ✅ Entscheidungshilfe: Refactoring vs. Neuaufbau vs. Hybrid
+- ✅ 12-Wochen Implementierungs-Roadmap
+- ✅ Konkrete Code-Beispiele und Best Practices
