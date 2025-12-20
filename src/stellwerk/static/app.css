@@ -103,78 +103,7 @@ button:hover{filter:brightness(1.05)}
 .goal-item.active{border-color: rgba(51,214,255,.45); box-shadow: 0 0 0 3px rgba(51,214,255,.12)}
 .goal-item-title{font-weight:800}
 .goal-item-desc{font-size:12px; color:var(--muted); margin-top:2px}
-
-.track-wrap{width:100%; overflow:auto; padding-bottom:6px}
-.track{
-  width:100%;
-  min-width:0;
-  height:320px;
-  display:block;
-  shape-rendering: geometricPrecision;
-  text-rendering: geometricPrecision;
-}
-
-.track.vertical{
-  height: 520px;
-}
-
-/* Track Map (HTML, clickable work packages) */
-.trackmap{display:flex; flex-direction:column; gap:12px}
-.trackmap-node{
-  position:relative;
-  padding:12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.04);
-}
-.trackmap-node.active{border-color: rgba(51,214,255,.35)}
-.trackmap-node-title{font-weight: 900; margin-bottom:2px}
-.trackmap-node-meta{font-size:12px; color: var(--muted)}
-
-.trackmap-wps{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
-.trackmap-wp{
-  display:inline-flex;
-  align-items:center;
-  max-width:100%;
-  text-decoration:none;
-  color: rgba(255,255,255,.90);
-  font-size: 12px;
-  font-weight: 900;
-  padding:6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-}
-.trackmap-wp:hover{text-decoration:underline}
-.trackmap-wp.done{border-color: rgba(46,229,157,.30); background: rgba(46,229,157,.10)}
-
-.trackmap-branch-title{margin-top:12px; font-size:12px; color: var(--muted); font-weight: 900}
-.trackmap-branches{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:8px}
-.trackmap-branch{
-  padding:10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: var(--panel);
-}
-.trackmap-branch.chosen{border-color: rgba(51,214,255,.35)}
-.trackmap-branch.active{box-shadow: 0 0 0 3px rgba(51,214,255,.10)}
-.trackmap-branch-head{display:flex; gap:10px; align-items:baseline; justify-content:space-between}
-.trackmap-branch-label{font-weight: 900; font-size:12px}
-.trackmap-branch-route{font-size:12px; color: var(--muted); text-align:right}
-.track-legend{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px}
 .pill{font-size:12px; color:var(--muted); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; background: rgba(255,255,255,.04)}
-
-.rail{stroke: rgba(255,255,255,.35); stroke-width:6; stroke-linecap:round; vector-effect: non-scaling-stroke; shape-rendering: crispEdges}
-.sleeper{stroke: rgba(255,255,255,.16); stroke-width:5; stroke-linecap:round; vector-effect: non-scaling-stroke; shape-rendering: crispEdges}
-
-.loco{fill: rgba(124,92,255,.85); stroke: rgba(255,255,255,.16); stroke-width:2}
-.wagon{fill: rgba(255,255,255,.10); stroke: rgba(255,255,255,.18); stroke-width:2}
-.wagon.done{fill: rgba(46,229,157,.18); stroke: rgba(46,229,157,.35)}
-.wheel{fill: rgba(255,255,255,.18); stroke: rgba(255,255,255,.22); stroke-width:2}
-.shine{fill: rgba(255,255,255,.18)}
-.wagon-title{font-size:12px; fill: rgba(255,255,255,.92)}
-.wagon-meta{font-size:11px; fill: rgba(255,255,255,.70)}
-.muted-svg{font-size:14px; fill: rgba(255,255,255,.70)}
 
 .details .task{margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.10)}
 .task-title{font-weight:900; margin-bottom:10px}
