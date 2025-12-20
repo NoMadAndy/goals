@@ -1,0 +1,55 @@
+name: Deploy preprod
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: preprod-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PREPROD_SSH_KEY }}
+
+      - name: Add host key
+        shell: bash
+        env:
+          PREPROD_HOST: ${{ secrets.PREPROD_HOST }}
+          PREPROD_PORT: ${{ secrets.PREPROD_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PREPROD_HOST:-}" ]]; then
+            echo "Missing secret PREPROD_HOST" >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          port="${PREPROD_PORT:-22}"
+          ssh-keyscan -p "$port" -H "$PREPROD_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy on preprod host
+        shell: bash
+        env:
+          PREPROD_HOST: ${{ secrets.PREPROD_HOST }}
+          PREPROD_USER: ${{ secrets.PREPROD_USER }}
+          PREPROD_PORT: ${{ secrets.PREPROD_SSH_PORT }}
+          PREPROD_PATH: ${{ secrets.PREPROD_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PREPROD_HOST:-}" || -z "${PREPROD_USER:-}" || -z "${PREPROD_PATH:-}" ]]; then
+            echo "Missing required secrets: PREPROD_HOST, PREPROD_USER, PREPROD_DEPLOY_PATH" >&2
+            exit 1
+          fi
+
+          port="${PREPROD_PORT:-22}"
+          ssh -p "$port" -o BatchMode=yes -o StrictHostKeyChecking=yes "$PREPROD_USER@$PREPROD_HOST" \
+            "cd '$PREPROD_PATH' && ./scripts/deploy-preprod.sh --update"

@@ -44,6 +44,26 @@ chmod +x scripts/deploy-preprod.sh
 ./scripts/deploy-preprod.sh
 ```
 
+### Auto-Deploy (GitHub Actions → Preprod)
+
+Dieses Repo enthält einen Workflow, der bei Push auf `main` automatisch den Preprod-Host aktualisiert und `./scripts/deploy-preprod.sh --update` ausführt.
+
+Voraussetzungen:
+
+- Preprod-Host ist per SSH erreichbar (vom GitHub Actions Runner aus).
+- Repo liegt auf dem Preprod-Host bereits auscheckt unter einem festen Pfad.
+- `docker` und `docker compose` (v2 Plugin) sind installiert.
+
+Benötigte GitHub Secrets (Repository → Settings → Secrets and variables → Actions):
+
+- `PREPROD_HOST`: Hostname/IP
+- `PREPROD_USER`: SSH-User
+- `PREPROD_SSH_KEY`: Private Key (deploy key) für den Zugriff
+- `PREPROD_DEPLOY_PATH`: Pfad zum Repo auf dem Host (z. B. `/opt/goals`)
+- `PREPROD_SSH_PORT` (optional): SSH Port (Default `22`)
+
+Manueller Lauf ist ebenfalls möglich über "Run workflow" (Workflow: "Deploy preprod").
+
 ## Prod (Docker Compose)
 
 Analog zu Preprod, aber mit `docker-compose.prod.yml` und `scripts/deploy-prod.sh`.
