@@ -15,12 +15,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "[prod] building image"
-docker compose -f docker-compose.prod.yml build --pull
+docker-compose -f docker-compose.prod.yml build --pull
 
 echo "[prod] starting services"
-docker compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.prod.yml up -d
 
 echo "[prod] health check"
-docker compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.prod.yml ps
 
 echo "[prod] done: open http://<host>:8002"
