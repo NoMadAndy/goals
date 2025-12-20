@@ -219,15 +219,29 @@
                     {% if t.notes %}<div class="muted" style="margin-bottom:10px">{{ t.notes }}</div>{% endif %}
                     <div class="packages">
                       {% for wp in t.work_packages %}
-                        <div class="package">
-                          <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
-                            <button type="submit" class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
-                              <div class="package-title">{{ wp.title }}</div>
-                              <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10</div>
-                            </button>
-                          </form>
-                          <a class="package-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Details</a>
-                        </div>
+                        <details class="package-item" id="wp-{{ wp.id }}">
+                          <summary class="package-btn {% if wp.status.value == 'done' %}done{% endif %}">
+                            <div class="package-title">{{ wp.title }}</div>
+                            <div class="package-meta">Länge {{ wp.length }} · Steigung {{ wp.grade }}/10 · Status {{ 'erledigt' if wp.status.value == 'done' else ('umgeleitet' if wp.status.value == 'diverted' else 'offen') }}</div>
+                          </summary>
+
+                          <div class="package-actions">
+                            <form method="post" action="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}/toggle">
+                              <button type="submit" class="package-action-btn">
+                                {{ 'Undo' if wp.status.value == 'done' else 'Done' }}
+                              </button>
+                            </form>
+                            <a class="package-action-link" href="/goals/{{ selected_goal.id }}/packages/{{ wp.id }}">Bearbeiten</a>
+                          </div>
+
+                          <div class="package-details">
+                            {% if wp.notes %}
+                              <div class="muted" style="white-space: pre-wrap">{{ wp.notes }}</div>
+                            {% else %}
+                              <div class="muted">Keine Notizen.</div>
+                            {% endif %}
+                          </div>
+                        </details>
                       {% endfor %}
                     </div>
                   </div>
@@ -247,5 +261,20 @@
 
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
     <script src="/static/toast.js"></script>
+
+    <script>
+      (() => {
+        const openFromHash = () => {
+          const h = window.location.hash || '';
+          if (!h.startsWith('#wp-')) return;
+          const el = document.querySelector(h);
+          if (el && el.tagName && el.tagName.toLowerCase() === 'details') {
+            el.open = true;
+          }
+        };
+        window.addEventListener('hashchange', openFromHash);
+        window.addEventListener('DOMContentLoaded', openFromHash);
+      })();
+    </script>
   </body>
 </html>

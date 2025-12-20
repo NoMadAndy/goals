@@ -117,6 +117,50 @@ button:hover{filter:brightness(1.05)}
 .track.vertical{
   height: 520px;
 }
+
+/* Track Map (HTML, clickable work packages) */
+.trackmap{display:flex; flex-direction:column; gap:12px}
+.trackmap-node{
+  position:relative;
+  padding:12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+}
+.trackmap-node.active{border-color: rgba(51,214,255,.35)}
+.trackmap-node-title{font-weight: 900; margin-bottom:2px}
+.trackmap-node-meta{font-size:12px; color: var(--muted)}
+
+.trackmap-wps{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+.trackmap-wp{
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  text-decoration:none;
+  color: rgba(255,255,255,.90);
+  font-size: 12px;
+  font-weight: 900;
+  padding:6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+}
+.trackmap-wp:hover{text-decoration:underline}
+.trackmap-wp.done{border-color: rgba(46,229,157,.30); background: rgba(46,229,157,.10)}
+
+.trackmap-branch-title{margin-top:12px; font-size:12px; color: var(--muted); font-weight: 900}
+.trackmap-branches{display:grid; grid-template-columns: 1fr; gap:10px; margin-top:8px}
+.trackmap-branch{
+  padding:10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: var(--panel);
+}
+.trackmap-branch.chosen{border-color: rgba(51,214,255,.35)}
+.trackmap-branch.active{box-shadow: 0 0 0 3px rgba(51,214,255,.10)}
+.trackmap-branch-head{display:flex; gap:10px; align-items:baseline; justify-content:space-between}
+.trackmap-branch-label{font-weight: 900; font-size:12px}
+.trackmap-branch-route{font-size:12px; color: var(--muted); text-align:right}
 .track-legend{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px}
 .pill{font-size:12px; color:var(--muted); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; background: rgba(255,255,255,.04)}
 
@@ -136,8 +180,53 @@ button:hover{filter:brightness(1.05)}
 .task-title{font-weight:900; margin-bottom:10px}
 .packages{display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px}
 .package{margin:0; position:relative}
+.package-item{margin:0; position:relative}
+.package-item > summary{list-style:none}
+.package-item > summary::-webkit-details-marker{display:none}
+.package-item > summary{cursor:pointer}
+
 .package-btn{width:100%; text-align:left; background: rgba(255,255,255,.06); color:var(--text); border:1px solid rgba(255,255,255,.14)}
+.package-btn{display:block; border-radius: 14px; padding:10px 12px}
 .package-btn.done{background: rgba(46,229,157,.14); border-color: rgba(46,229,157,.35)}
+
+.package-actions{
+  position:absolute;
+  right:10px;
+  top:10px;
+  display:flex;
+  gap:8px;
+}
+.package-action-btn{
+  padding:8px 10px;
+  border-radius: 12px;
+  font-weight: 900;
+  background: rgba(255,255,255,.08);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,.14);
+}
+.package-action-btn:hover{filter:brightness(1.05)}
+
+.package-action-link{
+  display:inline-flex;
+  align-items:center;
+  padding:8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(51,214,255,.85);
+  text-decoration:none;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+}
+.package-action-link:hover{text-decoration:underline}
+
+.package-details{
+  margin-top:8px;
+  padding:10px 12px;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border: 1px solid rgba(255,255,255,.10);
+}
 .package-title{font-weight:800; margin-bottom:2px}
 .package-meta{font-size:12px; color:var(--muted)}
 .package-link{display:inline-block; margin-top:6px; font-size:12px; color: rgba(51,214,255,.85); text-decoration:none}

@@ -1,5 +1,6 @@
 {% set routes = selected_goal.routes if selected_goal else [] %}
 {% set decisions = selected_goal.decisions if selected_goal else [] %}
+{% set edges = selected_goal.edges if selected_goal else [] %}
 {% set active_path = path_routes if path_routes is defined else (selected_goal.selected_path_routes() if selected_goal else []) %}
 
 {% set active_ids = [] %}
@@ -7,331 +8,99 @@
   {% set _ = active_ids.append(r.id|string) %}
 {% endfor %}
 
-{% set meta = namespace(max_phase=0) %}
+{# Lookups for graph rendering #}
+{% set routes_by_id = {} %}
 {% for r in routes %}
-  {% if (r.phase or 0) > meta.max_phase %}{% set meta.max_phase = (r.phase or 0) %}{% endif %}
+  {% set _ = routes_by_id.update({(r.id|string): r}) %}
 {% endfor %}
+{% set outgoing = {} %}
+{% for e in edges %}
+  {% set fk = e.from_route_id|string %}
+  {% set tk = e.to_route_id|string %}
+  {% if fk not in outgoing %}
+    {% set _ = outgoing.update({fk: []}) %}
+  {% endif %}
+  {% set _ = outgoing[fk].append(tk) %}
+{% endfor %}
+{% set decisions_by_from = {} %}
 {% for d in decisions %}
-  {% if (d.phase or 0) > meta.max_phase %}{% set meta.max_phase = (d.phase or 0) %}{% endif %}
+  {% if d.from_route_id %}
+    {% set _ = decisions_by_from.update({(d.from_route_id|string): d}) %}
+  {% endif %}
 {% endfor %}
-
-{% set phase_count = (meta.max_phase + 1) if (routes|length > 0 or decisions|length > 0) else 1 %}
-{% set y0 = 50 %}
-{% set phase_h = 180 %}
-{% set vb_h = y0 + (phase_count * phase_h) + 90 %}
-{% set vb_w = 320 %}
-{% set x_trunk = 160 %}
 
 <div class="track-wrap">
 
-  {% if selected_goal and selected_goal.edges and selected_goal.edges|length > 0 %}
-    {#
-      DAG-Visualisierung (generisch): routes = nodes, edges = Kanten.
-      Layout/Rendering machen wir in JS, um tiefe Verzweigungen + Merges einfach zu zeichnen.
-    #}
-
-    {% set js_routes = [] %}
-    {% for r in routes %}
-      {% set cnt = namespace(total=0, done=0) %}
-      {% for t in r.tasks %}
-        {% for wp in t.work_packages %}
-          {% set cnt.total = cnt.total + 1 %}
-          {% if wp.status.value == 'done' %}{% set cnt.done = cnt.done + 1 %}{% endif %}
-        {% endfor %}
-      {% endfor %}
-      {% set ratio = (cnt.done / cnt.total) if cnt.total > 0 else 0 %}
-      {% set _ = js_routes.append({'id': r.id|string, 'title': r.title, 'kind': r.kind.value, 'ratio': ratio}) %}
-    {% endfor %}
-
-    {% set js_edges = [] %}
-    {% for e in selected_goal.edges %}
-      {% set _ = js_edges.append({'from': e.from_route_id|string, 'to': e.to_route_id|string}) %}
-    {% endfor %}
-
-    {% set js_active_pairs = [] %}
-    {% for r in active_path %}
-      {% if not loop.first %}
-        {% set _ = js_active_pairs.append({'from': active_path[loop.index0 - 1].id|string, 'to': r.id|string}) %}
-      {% endif %}
-    {% endfor %}
-
-    <svg id="dag-track" class="track vertical" viewBox="0 0 700 320" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Plan als Liniengraph (DAG) senkrecht"></svg>
-
-    <script>
-      (() => {
-        const svg = document.getElementById('dag-track');
-        if (!svg) return;
-
-        const routes = {{ js_routes|tojson }};
-        const edges = {{ js_edges|tojson }};
-        const activeIds = new Set({{ active_ids|tojson }});
-        const activePairs = new Set(({{ js_active_pairs|tojson }}).map(p => `${p.from}→${p.to}`));
-
-        const ns = 'http://www.w3.org/2000/svg';
-        const el = (name, attrs = {}) => {
-          const n = document.createElementNS(ns, name);
-          for (const [k, v] of Object.entries(attrs)) {
-            n.setAttribute(k, String(v));
-          }
-          return n;
-        };
-
-        // Build adjacency
-        const nodes = new Map();
-        for (const r of routes) nodes.set(r.id, { ...r, out: [], incoming: 0 });
-
-        const incomingAdj = new Map();
-        for (const id of nodes.keys()) incomingAdj.set(id, []);
-
-        for (const e of edges) {
-          if (!nodes.has(e.from) || !nodes.has(e.to)) continue;
-          nodes.get(e.from).out.push(e.to);
-          nodes.get(e.to).incoming += 1;
-          incomingAdj.get(e.to).push(e.from);
-        }
-
-        // Kahn topological order (best effort)
-        const q = [];
-        for (const [id, n] of nodes.entries()) {
-          if (n.incoming === 0) q.push(id);
-        }
-        const topo = [];
-        const incomingLeft = new Map();
-        for (const [id, n] of nodes.entries()) incomingLeft.set(id, n.incoming);
-
-        while (q.length) {
-          const id = q.shift();
-          topo.push(id);
-          for (const to of nodes.get(id).out) {
-            incomingLeft.set(to, (incomingLeft.get(to) || 0) - 1);
-            if (incomingLeft.get(to) === 0) q.push(to);
-          }
-        }
-
-        if (topo.length !== nodes.size) {
-          // Fallback: still render something even if the graph isn't strictly a DAG.
-          topo.length = 0;
-          for (const id of nodes.keys()) topo.push(id);
-        }
-
-        // Depth (layer) = longest path from any root.
-        const depth = new Map();
-        for (const id of topo) {
-          const parents = incomingAdj.get(id) || [];
-          let d = 0;
-          for (const p of parents) d = Math.max(d, (depth.get(p) || 0) + 1);
-          depth.set(id, d);
-        }
-
-        let maxDepth = 0;
-        for (const d of depth.values()) maxDepth = Math.max(maxDepth, d);
-
-        // Layout constants (vertical)
-        const marginX = 50;
-        const marginY = 40;
-        const rowH = 170;
-        const colGap = 90;
-        const segLen = 120;
-
-        // Build layers
-        const layers = [];
-        for (let i = 0; i <= maxDepth; i++) layers.push([]);
-        for (const id of topo) {
-          const d = depth.get(id) || 0;
-          if (!layers[d]) layers[d] = [];
-          layers[d].push(id);
-        }
-
-        let maxInLayer = 1;
-        for (const layer of layers) maxInLayer = Math.max(maxInLayer, layer.length || 1);
-
-        const vbH = marginY + (maxDepth + 1) * rowH + 110;
-        const vbW = Math.max(280, marginX * 2 + (maxInLayer - 1) * colGap + 220);
-        svg.setAttribute('viewBox', `0 0 ${vbW} ${vbH}`);
-
-        // Compute coordinates
-        const pos = new Map();
-        for (let d = 0; d < layers.length; d++) {
-          const layer = layers[d] || [];
-          const count = layer.length || 1;
-          const layerWidth = (count - 1) * colGap;
-          const startX = (vbW - layerWidth) / 2;
-          for (let i = 0; i < layer.length; i++) {
-            const id = layer[i];
-            const x = startX + i * colGap;
-            const y = marginY + d * rowH;
-            pos.set(id, { x, y });
-          }
-        }
-
-        // Precompute outgoing order (for deterministic branch offsets)
-        const outgoingOrder = new Map();
-        for (const e of edges) {
-          if (!nodes.has(e.from) || !nodes.has(e.to)) continue;
-          const list = outgoingOrder.get(e.from) || [];
-          list.push(e.to);
-          outgoingOrder.set(e.from, list);
-        }
-        for (const [from, list] of outgoingOrder.entries()) {
-          list.sort();
-        }
-
-        const branchOffsetX = (from, to) => {
-          const list = outgoingOrder.get(from) || [];
-          if (list.length <= 1) return 0;
-          const idx = list.indexOf(to);
-          if (idx < 0) return 0;
-          const step = 18;
-          const center = (list.length - 1) / 2;
-          return (idx - center) * step;
-        };
-
-        // Draw connector edges first (as elbow paths, so branches stay visible)
-        for (const e of edges) {
-          const a = pos.get(e.from);
-          const b = pos.get(e.to);
-          if (!a || !b) continue;
-
-          const key = `${e.from}→${e.to}`;
-          const cls = activePairs.has(key) ? 'graph-branch active' : 'graph-branch';
-
-          const x0 = a.x + branchOffsetX(e.from, e.to);
-          const y0 = a.y + segLen / 2;
-          const x3 = b.x;
-          const y3 = b.y - segLen / 2;
-          const midY = (y0 + y3) / 2;
-
-          svg.appendChild(
-            el('path', {
-              d: `M ${x0} ${y0} L ${x0} ${midY} L ${x3} ${midY} L ${x3} ${y3}`,
-              class: cls,
-              fill: 'none',
-            })
-          );
-        }
-
-        // Draw nodes as route segments with progress overlay
-        for (const r of routes) {
-          const p = pos.get(r.id);
-          if (!p) continue;
-
-          const isActive = activeIds.has(r.id);
-          const baseCls = isActive ? 'graph-line active' : 'graph-line';
-          const doneCls = isActive ? 'graph-done active' : 'graph-done';
-          const y1 = p.y - segLen / 2;
-          const y2 = p.y + segLen / 2;
-          const yDone = y1 + (segLen * Math.max(0, Math.min(1, r.ratio || 0)));
-
-          svg.appendChild(el('line', { x1: p.x, y1, x2: p.x, y2, class: baseCls }));
-          svg.appendChild(el('line', { x1: p.x, y1, x2: p.x, y2: yDone, class: doneCls }));
-          svg.appendChild(el('circle', { cx: p.x, cy: p.y, r: 7, class: 'graph-node' }));
-
-          const label = el('text', { x: p.x + 14, y: y1 + 10, class: r.kind === 'branch' ? 'graph-branch-label' : 'graph-label' });
-          label.textContent = r.title;
-          svg.appendChild(label);
-        }
-      })();
-    </script>
+  {% if not selected_goal or routes|length == 0 %}
+    <div class="muted">Noch keine Strecke. Erstelle einen Plan.</div>
   {% else %}
 
-  <svg class="track vertical" viewBox="0 0 {{ vb_w }} {{ vb_h }}" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Plan als Liniengraph senkrecht">
+    {# New HTML track map: show active trunk with explicit branch blocks and clickable work packages #}
+    <div class="trackmap" role="navigation" aria-label="Strecke mit Arbeitspaketen">
 
-    {% if phase_count == 1 and routes|length == 0 %}
-      <text x="20" y="40" class="muted-svg">Noch keine Strecke. Erstelle einen Plan.</text>
-    {% endif %}
+      {% for r in active_path %}
+        <div class="trackmap-node {% if r.id in active_ids %}active{% endif %}">
+          <div class="trackmap-node-title">{{ r.title }}</div>
+          <div class="trackmap-node-meta">Phase {{ (r.phase or 0) + 1 }} · {{ 'Abschnitt' if r.kind.value == 'trunk' else 'Abzweig' }}</div>
 
-    {% for phase in range(0, phase_count) %}
-      {% set y1 = y0 + (phase * phase_h) %}
-      {% set y2 = y1 + phase_h %}
-      {% set y_mid = y1 + (phase_h * 0.55) %}
+          {% set has_wps = namespace(v=false) %}
+          {% for t in r.tasks %}
+            {% if t.work_packages|length > 0 %}{% set has_wps.v = true %}{% endif %}
+          {% endfor %}
 
-      {% set ph = namespace(trunk=none, branches=[], decision=none) %}
-      {% for r in routes %}
-        {% if (r.phase or 0) == phase %}
-          {% if r.kind.value == 'trunk' and ph.trunk is none %}
-            {% set ph.trunk = r %}
-          {% elif r.kind.value == 'branch' %}
-            {% set _ = ph.branches.append(r) %}
+          {% if has_wps.v %}
+            <div class="trackmap-wps">
+              {% for t in r.tasks %}
+                {% for wp in t.work_packages %}
+                  <a class="trackmap-wp {% if wp.status.value == 'done' %}done{% endif %}" href="#wp-{{ wp.id }}" title="{{ t.title }}">
+                    {{ wp.title }}
+                  </a>
+                {% endfor %}
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="muted" style="margin-top:8px">Keine Arbeitspakete.</div>
           {% endif %}
-        {% endif %}
+
+          {# Branches at this node (graph schema) #}
+          {% set d = decisions_by_from.get(r.id|string) %}
+          {% if d and d.options|length > 0 %}
+            <div class="trackmap-branch-title">Weiche: {{ d.title }}</div>
+            <div class="trackmap-branches">
+              {% set chosen_opt = d.chosen_option_id or (d.options[0].id if d.options|length > 0 else none) %}
+              {% set next_active_id = (active_path[loop.index0 + 1].id|string) if loop.index0 + 1 < active_path|length else '' %}
+
+              {% for opt in d.options %}
+                {% set br = routes_by_id.get(opt.route_id|string) %}
+                {% set is_chosen = (chosen_opt and opt.id == chosen_opt) %}
+                {% set is_next = (next_active_id and (opt.route_id|string) == next_active_id) %}
+
+                <div class="trackmap-branch {% if is_chosen %}chosen{% endif %}{% if is_next %} active{% endif %}">
+                  <div class="trackmap-branch-head">
+                    <div class="trackmap-branch-label">{{ opt.label }}</div>
+                    {% if br %}<div class="trackmap-branch-route">{{ br.title }}</div>{% endif %}
+                  </div>
+
+                  {% if br %}
+                    <div class="trackmap-wps">
+                      {% for t in br.tasks %}
+                        {% for wp in t.work_packages %}
+                          <a class="trackmap-wp {% if wp.status.value == 'done' %}done{% endif %}" href="#wp-{{ wp.id }}" title="{{ t.title }}">
+                            {{ wp.title }}
+                          </a>
+                        {% endfor %}
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="muted">(Route fehlt)</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+        </div>
       {% endfor %}
-
-      {% for dd in decisions %}
-        {% if (dd.phase or 0) == phase %}
-          {% set ph.decision = dd %}
-        {% endif %}
-      {% endfor %}
-
-      <!-- Phase marker -->
-      <circle cx="{{ x_trunk }}" cy="{{ y1 }}" r="7" class="graph-node" />
-      <text x="{{ x_trunk + 12 }}" y="{{ y1 + 4 }}" class="graph-phase">{{ phase + 1 }}</text>
-
-      {% if ph.trunk %}
-        {% set cnt = namespace(total=0, done=0) %}
-        {% for t in ph.trunk.tasks %}
-          {% for wp in t.work_packages %}
-            {% set cnt.total = cnt.total + 1 %}
-            {% if wp.status.value == 'done' %}{% set cnt.done = cnt.done + 1 %}{% endif %}
-          {% endfor %}
-        {% endfor %}
-        {% set ratio = (cnt.done / cnt.total) if cnt.total > 0 else 0 %}
-        {% set is_active = (ph.trunk.id in active_ids) %}
-
-        <line x1="{{ x_trunk }}" y1="{{ y1 }}" x2="{{ x_trunk }}" y2="{{ y2 }}" class="graph-line{% if is_active %} active{% endif %}" />
-        <line x1="{{ x_trunk }}" y1="{{ y1 }}" x2="{{ x_trunk }}" y2="{{ y1 + (phase_h * ratio) }}" class="graph-done{% if is_active %} active{% endif %}" />
-        <text x="{{ x_trunk + 14 }}" y="{{ y1 + 14 }}" class="graph-label">{{ ph.trunk.title }}</text>
-      {% else %}
-        <line x1="{{ x_trunk }}" y1="{{ y1 }}" x2="{{ x_trunk }}" y2="{{ y2 }}" class="graph-line missing" />
-      {% endif %}
-
-      {% if ph.decision and ph.branches|length > 0 %}
-        {% set ch = namespace(route_id=none) %}
-        {% set chosen_opt = ph.decision.chosen_option_id or (ph.decision.options[0].id if ph.decision.options|length > 0 else none) %}
-        {% for opt in ph.decision.options %}
-          {% if chosen_opt and opt.id == chosen_opt %}{% set ch.route_id = opt.route_id %}{% endif %}
-        {% endfor %}
-
-        {% set positions = [] %}
-        {% if ph.branches|length == 1 %}
-          {% set _ = positions.append(x_trunk - 70) %}
-        {% elif ph.branches|length == 2 %}
-          {% set _ = positions.append(x_trunk - 70) %}
-          {% set _ = positions.append(x_trunk + 70) %}
-        {% else %}
-          {% set _ = positions.append(x_trunk - 90) %}
-          {% set _ = positions.append(x_trunk - 20) %}
-          {% set _ = positions.append(x_trunk + 60) %}
-        {% endif %}
-
-        {% for br in ph.branches %}
-          {% set xb = positions[loop.index0] if loop.index0 < positions|length else (x_trunk + (loop.index0 * 70)) %}
-          {% set is_active = (br.id in active_ids) %}
-          {% set is_chosen = (ch.route_id and br.id == ch.route_id) %}
-
-          {% set cntb = namespace(total=0, done=0) %}
-          {% for t in br.tasks %}
-            {% for wp in t.work_packages %}
-              {% set cntb.total = cntb.total + 1 %}
-              {% if wp.status.value == 'done' %}{% set cntb.done = cntb.done + 1 %}{% endif %}
-            {% endfor %}
-          {% endfor %}
-          {% set ratio_b = (cntb.done / cntb.total) if cntb.total > 0 else 0 %}
-
-          <!-- branch out (from trunk) -->
-          <line x1="{{ x_trunk }}" y1="{{ y_mid - 10 }}" x2="{{ xb }}" y2="{{ y_mid + 18 }}" class="graph-branch{% if is_active %} active{% endif %}{% if is_chosen %} chosen{% endif %}" />
-          <!-- branch vertical -->
-          <line x1="{{ xb }}" y1="{{ y_mid + 18 }}" x2="{{ xb }}" y2="{{ y2 - 24 }}" class="graph-branch{% if is_active %} active{% endif %}{% if is_chosen %} chosen{% endif %}" />
-          <line x1="{{ xb }}" y1="{{ y_mid + 18 }}" x2="{{ xb }}" y2="{{ y_mid + 18 + ((y2 - 24) - (y_mid + 18)) * ratio_b }}" class="graph-done{% if is_active %} active{% endif %}" />
-          <!-- merge back to trunk -->
-          <line x1="{{ xb }}" y1="{{ y2 - 24 }}" x2="{{ x_trunk }}" y2="{{ y2 }}" class="graph-branch{% if is_active %} active{% endif %}{% if is_chosen %} chosen{% endif %}" />
-
-          <text x="{{ xb + 12 }}" y="{{ y_mid + 10 }}" class="graph-branch-label">{{ br.title }}</text>
-        {% endfor %}
-      {% endif %}
-    {% endfor %}
-
-    <!-- end marker -->
-    <circle cx="{{ x_trunk }}" cy="{{ y0 + (phase_count * phase_h) }}" r="7" class="graph-node" />
-  </svg>
+    </div>
   {% endif %}
 </div>
