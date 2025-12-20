@@ -14,13 +14,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if ! docker compose version >/dev/null 2>&1; then
+	echo "[prod] ERROR: 'docker compose' (Compose v2 Plugin) not found." >&2
+	echo "[prod] Please install Docker Compose v2. The legacy 'docker-compose' v1 often fails with: KeyError: 'ContainerConfig'." >&2
+	exit 1
+fi
+
 echo "[prod] building image"
-docker-compose -f docker-compose.prod.yml build --pull
+docker compose -f docker-compose.prod.yml build --pull
 
 echo "[prod] starting services"
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
 echo "[prod] health check"
-docker-compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 
 echo "[prod] done: open http://<host>:8002"
