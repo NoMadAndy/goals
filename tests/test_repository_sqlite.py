@@ -4,6 +4,7 @@ from stellwerk.db import init_db, open_session
 from stellwerk.repository import (
     apply_plan,
     create_goal,
+    delete_goal,
     get_goal,
     list_goals,
     toggle_work_package,
@@ -150,3 +151,25 @@ def test_apply_plan_skips_decision_with_missing_route_fk():
         assert len(goal.routes) == 1
         # Decision should have been skipped rather than violating FK.
         assert len(goal.decisions) == 0
+
+
+def test_delete_goal_removes_goal_and_children():
+    engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
+    init_db(engine)
+
+    with open_session(engine) as session:
+        goal_id = create_goal(session, title="Ziel", description="")
+
+    planned = _sample_goal()
+    with open_session(engine) as session:
+        apply_plan(session, goal_id, planned)
+
+    with open_session(engine) as session:
+        assert get_goal(session, goal_id) is not None
+
+    with open_session(engine) as session:
+        delete_goal(session, goal_id)
+
+    with open_session(engine) as session:
+        assert get_goal(session, goal_id) is None
+        assert list_goals(session) == []

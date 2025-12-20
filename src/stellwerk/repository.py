@@ -84,6 +84,38 @@ def create_goal(session: Session, title: str, description: str, *, log=None) -> 
     return goal.id
 
 
+def delete_goal(session: Session, goal_id: UUID, *, log=None) -> None:
+    row = session.get(GoalRow, str(goal_id))
+    if not row:
+        _log(log, "warn", "DB: goal delete not found", {"goal_id": str(goal_id)})
+        return
+
+    # Be explicit about delete order to work reliably even when FK cascades
+    # are not enforced (e.g. SQLite without PRAGMA foreign_keys=ON).
+    session.execute(
+        delete(WorkPackageRow).where(
+            WorkPackageRow.task_id.in_(select(TaskRow.id).where(TaskRow.goal_id == row.id))
+        )
+    )
+    session.execute(delete(TaskRow).where(TaskRow.goal_id == row.id))
+    session.execute(
+        delete(DecisionOptionRow).where(
+            DecisionOptionRow.decision_id.in_(
+                select(DecisionRow.id).where(DecisionRow.goal_id == row.id)
+            )
+        )
+    )
+    session.execute(delete(DecisionRow).where(DecisionRow.goal_id == row.id))
+    session.execute(delete(RouteEdgeRow).where(RouteEdgeRow.goal_id == row.id))
+    session.execute(delete(RouteRow).where(RouteRow.goal_id == row.id))
+    session.execute(delete(PersonRow).where(PersonRow.goal_id == row.id))
+
+    session.execute(delete(GoalRow).where(GoalRow.id == row.id))
+    session.commit()
+
+    _log(log, "info", "DB: goal deleted", {"goal_id": str(goal_id)})
+
+
 def apply_plan(
     session: Session, goal_id: UUID, planned: Goal, *, plan_source: str = "", log=None
 ) -> None:

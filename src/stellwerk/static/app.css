@@ -91,6 +91,8 @@ button{
 button:hover{filter:brightness(1.05)}
 
 .goal-list{display:flex; flex-direction:column; gap:10px}
+.goal-row{display:flex; gap:10px; align-items:stretch}
+.goal-row form{display:flex}
 .goal-item{
   display:block;
   text-decoration:none;
@@ -99,10 +101,24 @@ button:hover{filter:brightness(1.05)}
   border:1px solid rgba(255,255,255,.10);
   border-radius: 14px;
   padding:10px 12px;
+  flex:1;
 }
 .goal-item.active{border-color: rgba(51,214,255,.45); box-shadow: 0 0 0 3px rgba(51,214,255,.12)}
 .goal-item-title{font-weight:800}
 .goal-item-desc{font-size:12px; color:var(--muted); margin-top:2px}
+
+.goal-icon-btn{
+  width:44px;
+  min-width:44px;
+  border-radius: 14px;
+  padding:10px 0;
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,.14);
+  cursor:pointer;
+  font-weight: 900;
+}
+.goal-icon-btn:hover{filter:brightness(1.05)}
 .pill{font-size:12px; color:var(--muted); border:1px solid rgba(255,255,255,.12); padding:6px 10px; border-radius:999px; background: rgba(255,255,255,.04)}
 
 .details .task{margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.10)}

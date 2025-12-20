@@ -28,6 +28,7 @@ from stellwerk.repository import (
     apply_plan,
     choose_decision_option,
     create_goal as repo_create_goal,
+    delete_goal as repo_delete_goal,
     delete_person,
     get_goal as repo_get_goal,
     get_work_package,
@@ -210,6 +211,14 @@ async def create_goal(title: str = Form(""), description: str = Form("")):
     await _dbg("info", "Goal: created", {"goal_id": str(goal_id), "title": title})
 
     return RedirectResponse(url=f"/?goal={goal_id}", status_code=303)
+
+
+@app.post("/goals/{goal_id}/delete")
+async def delete_goal(goal_id: UUID):
+    with open_session(engine) as session:
+        repo_delete_goal(session, goal_id)
+    await _dbg("info", "Goal: deleted", {"goal_id": str(goal_id)})
+    return RedirectResponse(url="/", status_code=303)
 
 
 @app.post("/goals/{goal_id}/plan")
