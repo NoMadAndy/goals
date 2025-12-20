@@ -11,5 +11,4 @@ Environment=REPO_DIR=/opt/goals
 Environment=DEPLOY_FLAGS=
 EnvironmentFile=-/etc/stellwerk-preprod-autodeploy.env
 
-WorkingDirectory=${REPO_DIR}
-ExecStart=/usr/bin/env bash -lc './scripts/preprod-autodeploy.sh'
+ExecStart=/usr/bin/env bash -lc 'cd "${REPO_DIR}" && ./scripts/preprod-autodeploy.sh'
