@@ -326,7 +326,7 @@ button:hover{filter:brightness(1.05)}
 .debug-console{
   position: fixed;
   left: 12px;
-  top: 12px;
+  top: 76px;
   right: auto;
   z-index: 50;
   width: min(520px, calc(100vw - 24px));
@@ -335,6 +335,21 @@ button:hover{filter:brightness(1.05)}
   border-radius: 16px;
   background: rgba(5,8,16,.72);
   backdrop-filter: blur(14px);
+}
+
+/* Closed: keep it minimal and out of the way */
+.debug-console[data-open="false"]{
+  width: fit-content;
+  max-width: calc(100vw - 24px);
+}
+.debug-console[data-open="false"] .debug-bar{
+  padding:6px;
+  gap:8px;
+}
+.debug-console[data-open="false"] .debug-status,
+.debug-console[data-open="false"] .debug-spacer,
+.debug-console[data-open="false"] .debug-clear{
+  display:none;
 }
 .debug-bar{
   display:flex;
@@ -376,5 +391,5 @@ button:hover{filter:brightness(1.05)}
   .row-right{flex-direction:column; align-items:stretch}
   .grid2{grid-template-columns: 1fr}
   .track{min-width: 720px}
-  .debug-console{left: 10px; right: 10px; top: 10px; width: auto}
+  .debug-console{left: 10px; right: 10px; top: 72px; width: auto}
 }
