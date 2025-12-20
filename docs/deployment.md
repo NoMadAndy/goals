@@ -44,25 +44,42 @@ chmod +x scripts/deploy-preprod.sh
 ./scripts/deploy-preprod.sh
 ```
 
-### Auto-Deploy (GitHub Actions → Preprod)
+### Auto-Deploy (Preprod-Host pullt regelmäßig)
 
-Dieses Repo enthält einen Workflow, der bei Push auf `main` automatisch den Preprod-Host aktualisiert und `./scripts/deploy-preprod.sh --update` ausführt.
+Statt GitHub Actions kann auf dem Preprod-Host ein `systemd` Timer laufen, der regelmäßig auf neue Commits prüft und dann deployt.
 
-Voraussetzungen:
+Im Repo sind dafür enthalten:
 
-- Preprod-Host ist per SSH erreichbar (vom GitHub Actions Runner aus).
-- Repo liegt auf dem Preprod-Host bereits auscheckt unter einem festen Pfad.
-- `docker` und `docker compose` (v2 Plugin) sind installiert.
+- `scripts/preprod-autodeploy.sh` (prüft `origin/main` und ruft bei Änderungen `scripts/deploy-preprod.sh --update` auf)
+- `scripts/systemd/stellwerk-preprod-autodeploy.service`
+- `scripts/systemd/stellwerk-preprod-autodeploy.timer`
 
-Benötigte GitHub Secrets (Repository → Settings → Secrets and variables → Actions):
+Setup auf dem Preprod-Host (Beispiel):
 
-- `PREPROD_HOST`: Hostname/IP
-- `PREPROD_USER`: SSH-User
-- `PREPROD_SSH_KEY`: Private Key (deploy key) für den Zugriff
-- `PREPROD_DEPLOY_PATH`: Pfad zum Repo auf dem Host (z. B. `/opt/goals`)
-- `PREPROD_SSH_PORT` (optional): SSH Port (Default `22`)
+```bash
+cd /opt/goals
+chmod +x scripts/preprod-autodeploy.sh
 
-Manueller Lauf ist ebenfalls möglich über "Run workflow" (Workflow: "Deploy preprod").
+sudo cp scripts/systemd/stellwerk-preprod-autodeploy.service /etc/systemd/system/
+sudo cp scripts/systemd/stellwerk-preprod-autodeploy.timer /etc/systemd/system/
+
+# Repo-Pfad konfigurieren (empfohlen)
+sudo tee /etc/stellwerk-preprod-autodeploy.env >/dev/null <<'ENV'
+REPO_DIR=/opt/goals
+# Optional: zusätzliche Deploy-Flags, z.B. "--down" oder "--no-cache"
+DEPLOY_FLAGS=
+ENV
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now stellwerk-preprod-autodeploy.timer
+systemctl status stellwerk-preprod-autodeploy.timer
+```
+
+Logs:
+
+```bash
+journalctl -u stellwerk-preprod-autodeploy.service -n 200 --no-pager
+```
 
 ## Prod (Docker Compose)
 

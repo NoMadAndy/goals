@@ -1,0 +1,15 @@
+[Unit]
+Description=Stellwerk preprod auto-deploy (pull + docker compose)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+
+# Configure these via /etc/stellwerk-preprod-autodeploy.env (recommended)
+Environment=REPO_DIR=/opt/goals
+Environment=DEPLOY_FLAGS=
+EnvironmentFile=-/etc/stellwerk-preprod-autodeploy.env
+
+WorkingDirectory=${REPO_DIR}
+ExecStart=/usr/bin/env bash -lc './scripts/preprod-autodeploy.sh'
