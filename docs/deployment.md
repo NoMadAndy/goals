@@ -11,11 +11,8 @@ Dieses Repository macht **keine Annahmen** über Cloud/Provider. Stattdessen gib
 
 ### Voraussetzungen
 
-- Host mit `docker` und `docker compose` (Plugin)
-- Port `8002` erreichbar (oder via Reverse Proxy)
 
-### Setup
-
+Wichtig: Für den pull-basierten Ansatz muss der Repo-Pfad (z. B. `/opt/goals`) ein echtes Git-Checkout sein (also mit `.git/`). Ein reines Kopieren der Dateien ohne Git-Metadaten reicht nicht.
 1. Repo auf dem Preprod-Host auschecken/aktualisieren
 2. Optional: `.env` anlegen (siehe `.env.example`)
 

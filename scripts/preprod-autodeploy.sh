@@ -26,6 +26,8 @@ fi
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "[preprod-autodeploy] ERROR: not a git work tree: $ROOT_DIR" >&2
+  echo "[preprod-autodeploy] Hint: REPO_DIR must be a real 'git clone' (needs a .git directory)." >&2
+  echo "[preprod-autodeploy] Check: ls -la '$ROOT_DIR/.git'" >&2
   exit 1
 fi
 
