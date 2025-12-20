@@ -33,9 +33,12 @@ def _emit_progress(
     *,
     level: str,
     message: str,
+    step: str | None = None,
     data: dict[str, Any] | None = None,
 ) -> None:
     ev: dict[str, Any] = {"level": level, "message": message}
+    if step:
+        ev["step"] = step
     if data:
         ev["data"] = data
 
@@ -182,6 +185,7 @@ def parse_openai_plan(
                         emit,
                         level="info",
                         message=f"Fülle Arbeitspaket: {wp_title}",
+                        step="parse.work_package",
                         data={"route": route_title, "task": task_title},
                     )
             tasks.append(
@@ -237,7 +241,11 @@ def parse_openai_plan(
     # Note: the model may use string IDs. We map them to domain UUIDs.
     if parsed.get("edges") is not None or _looks_like_graph_schema(parsed):
         _emit_progress(
-            progress_events, emit, level="info", message="Struktur: Graph wird verarbeitet"
+            progress_events,
+            emit,
+            level="info",
+            message="Struktur: Graph wird verarbeitet",
+            step="parse.schema.graph",
         )
         raw_routes = parsed.get("routes") or []
         if not isinstance(raw_routes, list) or not raw_routes:
@@ -595,8 +603,13 @@ async def openai_plan(req: PlanRequest) -> PlanResult:
         "- 6–20 Knoten (routes) insgesamt.\n"
         "- Pro Route: 2–6 Aufgaben. Pro Aufgabe: 2–6 Arbeitspakete.\n\n"
         "WICHTIG: Arbeitspakete müssen nicht nur sagen WAS, sondern WIE.\n"
-        "`notes` muss ausführliches Markdown enthalten: konkrete Schritte, Definition of Done, Risiken,\n"
-        "und am Ende einen Abschnitt 'Quellen' mit 1–5 URLs. Optional: Bild-URLs als Liste im Text (z. B. unter 'Bilder').\n\n"
+        "`notes` muss ausführliches Markdown enthalten und diese Überschriften verwenden:\n"
+        "- ## Kurzfassung\n"
+        "- ## Schritte\n"
+        "- ## Definition of Done\n"
+        "- ## Risiken\n"
+        "- ## Quellen (1–5 URLs)\n"
+        "Optional: ## Bilder (0–5 Bild-URLs)\n\n"
         "Schema (JSON):\n"
         "{\n"
         "  title, description, prologue, rallying_cry,\n"
@@ -760,13 +773,21 @@ async def openai_plan_with_progress(
     progress: list[dict[str, Any]] = []
 
     if not settings.openai_api_key:
-        _emit_progress(progress, emit, level="error", message="OPENAI_API_KEY fehlt")
+        _emit_progress(
+            progress,
+            emit,
+            level="error",
+            message="OPENAI_API_KEY fehlt",
+            step="guard.missing_key",
+        )
         return PlanResultWithProgress(
             PlanResult(goal=None, source="openai", error="missing_openai_api_key"), progress
         )
 
     # We can't tap into token-by-token generation, but we can show meaningful stages.
-    _emit_progress(progress, emit, level="info", message="KI: Anfrage wird vorbereitet")
+    _emit_progress(
+        progress, emit, level="info", message="KI: Anfrage wird vorbereitet", step="openai.prepare"
+    )
 
     # Inline a small copy of openai_plan's call to keep behavior consistent,
     # but route parsing through parse_openai_plan(progress_events=...).
@@ -826,7 +847,7 @@ async def openai_plan_with_progress(
     )
     retryable_status = {429, 500, 502, 503, 504}
 
-    _emit_progress(progress, emit, level="info", message="KI: Anfrage wird gesendet")
+    _emit_progress(progress, emit, level="info", message="KI: Anfrage wird gesendet", step="openai.request")
 
     last_error: str | None = None
     for attempt in range(0, max(0, settings.openai_retries) + 1):
@@ -843,6 +864,7 @@ async def openai_plan_with_progress(
                     emit,
                     level="warn",
                     message="KI: temporäres Problem, versuche erneut",
+                    step="openai.retryable_status",
                     data={"status": resp.status_code, "attempt": attempt + 1},
                 )
                 if attempt < settings.openai_retries:
@@ -855,12 +877,18 @@ async def openai_plan_with_progress(
             resp.raise_for_status()
             data = resp.json()
             content = data["choices"][0]["message"]["content"]
-            _emit_progress(progress, emit, level="info", message="KI: Antwort erhalten, parse JSON")
+            _emit_progress(
+                progress,
+                emit,
+                level="info",
+                message="KI: Antwort erhalten, parse JSON",
+                step="openai.response_parse",
+            )
             parsed = _extract_json_object(content)
 
             # Collect parse events for toasts.
             goal = parse_openai_plan(parsed, req, progress_events=progress, emit=emit)
-            _emit_progress(progress, emit, level="info", message="KI: Plan fertig")
+            _emit_progress(progress, emit, level="info", message="KI: Plan fertig", step="openai.done")
             return PlanResultWithProgress(PlanResult(goal=goal, source="openai"), progress)
         except httpx.ReadTimeout:
             last_error = "openai_timeout"
@@ -869,6 +897,7 @@ async def openai_plan_with_progress(
                 emit,
                 level="warn",
                 message="KI: Timeout, versuche erneut",
+                step="openai.timeout",
                 data={"attempt": attempt + 1},
             )
             if attempt < settings.openai_retries:
@@ -884,6 +913,7 @@ async def openai_plan_with_progress(
                 emit,
                 level="warn",
                 message="KI: Verbindungsfehler, versuche erneut",
+                step="openai.connect_error",
                 data={"attempt": attempt + 1},
             )
             if attempt < settings.openai_retries:
@@ -902,6 +932,7 @@ async def openai_plan_with_progress(
                 emit,
                 level="error",
                 message="KI: Ungültiger Plan",
+                step="openai.invalid_plan",
                 data={"error": last_error},
             )
             if attempt < settings.openai_retries:
@@ -917,6 +948,7 @@ async def openai_plan_with_progress(
                 emit,
                 level="error",
                 message="KI: Fehler",
+                step="openai.error",
                 data={"type": e.__class__.__name__},
             )
             if attempt < settings.openai_retries:

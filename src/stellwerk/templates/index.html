@@ -232,10 +232,91 @@
                           </div>
 
                           <div class="package-details">
-                            {% if wp.notes %}
-                              <div class="muted" style="white-space: pre-wrap">{{ wp.notes }}</div>
-                            {% else %}
-                              <div class="muted">Keine Notizen.</div>
+                            {% set d = (wp.notes | wp_details(wp.title)) %}
+
+                            {% if d.summary %}
+                              <div class="wp-section">
+                                <div class="wp-h">Kurzfassung</div>
+                                <div class="muted" style="white-space: pre-wrap">{{ d.summary }}</div>
+                              </div>
+                            {% endif %}
+
+                            {% if d.steps and d.steps|length > 0 %}
+                              <div class="wp-section">
+                                <div class="wp-h">Ablauf</div>
+                                <div class="wp-flow" aria-label="Ablauf (Diagramm)">
+                                  {% for s in d.steps[:6] %}
+                                    <div class="wp-flow-step">{{ s }}</div>
+                                  {% endfor %}
+                                </div>
+                                <ol class="wp-ol">
+                                  {% for s in d.steps %}
+                                    <li>{{ s }}</li>
+                                  {% endfor %}
+                                </ol>
+                              </div>
+                            {% endif %}
+
+                            {% if d.checklist and d.checklist|length > 0 %}
+                              <div class="wp-section">
+                                <div class="wp-h">Definition of Done</div>
+                                <div class="wp-checklist">
+                                  {% for c in d.checklist %}
+                                    <label class="wp-check">
+                                      <input type="checkbox" disabled {% if c.done %}checked{% endif %} />
+                                      <span>{{ c.text }}</span>
+                                    </label>
+                                  {% endfor %}
+                                </div>
+                              </div>
+                            {% endif %}
+
+                            {% if d.risks and d.risks|length > 0 %}
+                              <div class="wp-section">
+                                <div class="wp-h">Risiken & Stolpersteine</div>
+                                <ul class="wp-ul">
+                                  {% for r in d.risks %}
+                                    <li>{{ r }}</li>
+                                  {% endfor %}
+                                </ul>
+                              </div>
+                            {% endif %}
+
+                            {% if d.sources and d.sources|length > 0 %}
+                              <div class="wp-section">
+                                <div class="wp-h">Quellen</div>
+                                <ul class="wp-ul">
+                                  {% for u in d.sources %}
+                                    <li><a class="link" href="{{ u }}" target="_blank" rel="noopener noreferrer">{{ u }}</a></li>
+                                  {% endfor %}
+                                </ul>
+                              </div>
+                            {% endif %}
+
+                            {% if d.images and d.images|length > 0 %}
+                              <div class="wp-section">
+                                <div class="wp-h">Bilder</div>
+                                <div class="wp-images">
+                                  {% for u in d.images %}
+                                    <a class="wp-image" href="{{ u }}" target="_blank" rel="noopener noreferrer">
+                                      <img src="{{ u }}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                                    </a>
+                                  {% endfor %}
+                                </div>
+                              </div>
+                            {% endif %}
+
+                            {% if d.extra_sections %}
+                              {% for k, v in d.extra_sections.items() %}
+                                <div class="wp-section">
+                                  <div class="wp-h">{{ k }}</div>
+                                  <div class="muted" style="white-space: pre-wrap">{{ v }}</div>
+                                </div>
+                              {% endfor %}
+                            {% endif %}
+
+                            {% if (not d.summary) and (not d.steps) and (not d.checklist) and (not d.risks) and (not d.sources) and (not d.images) and (not d.extra_sections) %}
+                              <div class="muted">Keine Details.</div>
                             {% endif %}
                           </div>
                         </details>

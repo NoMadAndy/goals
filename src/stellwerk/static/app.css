@@ -147,6 +147,38 @@ button:hover{filter:brightness(1.05)}
   border: 1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.04);
 }
+
+/* Work package details (structured rendering) */
+.wp-section{margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.10)}
+.wp-section:first-child{margin-top:0; padding-top:0; border-top:0}
+.wp-h{font-size:12px; font-weight: 900; color: var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px}
+
+.wp-ol,.wp-ul{margin:0; padding-left:18px}
+.wp-ol li,.wp-ul li{margin:6px 0}
+
+.wp-checklist{display:flex; flex-direction:column; gap:8px}
+.wp-check{display:flex; gap:10px; align-items:flex-start; font-size:14px}
+.wp-check input{margin-top:2px; width:16px; height:16px}
+.wp-check span{color: rgba(255,255,255,.90)}
+
+.wp-flow{display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 10px 0}
+.wp-flow-step{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  padding:6px 10px;
+  border-radius: 999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  font-size: 12px;
+  font-weight: 900;
+  color: rgba(255,255,255,.86);
+}
+
+.wp-images{display:flex; flex-wrap:wrap; gap:10px; margin-top:6px}
+.wp-image{display:inline-flex; width:120px; height:72px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03)}
+.wp-image img{width:100%; height:100%; object-fit:cover; display:block}
 .package-action-link:hover{text-decoration:underline}
 
 .package-details{

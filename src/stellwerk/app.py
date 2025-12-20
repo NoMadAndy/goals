@@ -22,6 +22,7 @@ from stellwerk.debug import (
     sse_encode,
 )
 from stellwerk.models import PersonDirection, PersonRole, WorkPackageStatus
+from stellwerk.notes import default_work_package_details
 from stellwerk.planner import PlanRequest, openai_plan, openai_plan_with_progress
 from stellwerk.repository import (
     apply_plan,
@@ -127,6 +128,12 @@ async def request_debug_middleware(request: Request, call_next):
 
 app.mount("/static", StaticFiles(directory="src/stellwerk/static"), name="static")
 templates = Jinja2Templates(directory="src/stellwerk/templates")
+
+# Templates: helper for rich work package details.
+templates.env.filters["wp_details"] = lambda notes, title="": default_work_package_details(
+    title=str(title or ""),
+    notes=str(notes or ""),
+)
 
 
 class PlanApiRequest(BaseModel):
@@ -256,7 +263,18 @@ async def plan_goal_stream(goal_id: UUID, context: str = Form("")) -> StreamingR
     """
 
     async def gen() -> AsyncGenerator[str, None]:
-        yield sse_encode({"level": "info", "message": "KI: Planung startet"})
+        async def _log_plan_event(ev: dict) -> None:
+            if not settings.stellwerk_debug:
+                return
+            step = str(ev.get("step") or "")
+            msg = str(ev.get("message") or "")
+            lvl = str(ev.get("level") or "info")
+            data = ev.get("data") if isinstance(ev.get("data"), dict) else None
+            await _dbg(lvl, f"Plan: {step} {msg}".strip(), data)
+
+        start_ev = {"level": "info", "message": "KI: Planung startet", "step": "stream.start"}
+        await _log_plan_event(start_ev)
+        yield sse_encode(start_ev)
 
         with open_session(engine) as session:
             existing = repo_get_goal(session, goal_id)
@@ -286,6 +304,7 @@ async def plan_goal_stream(goal_id: UUID, context: str = Form("")) -> StreamingR
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=1.0)
                 if isinstance(ev, dict):
+                    await _log_plan_event(ev)
                     yield sse_encode(ev)
             except asyncio.TimeoutError:
                 pass
@@ -294,19 +313,21 @@ async def plan_goal_stream(goal_id: UUID, context: str = Form("")) -> StreamingR
             elapsed = time.perf_counter() - started
             if elapsed - last_heartbeat >= 2.0:
                 last_heartbeat = elapsed
-                yield sse_encode(
-                    {
-                        "level": "info",
-                        "message": "KI: arbeitet noch…",
-                        "data": {"seconds": int(elapsed)},
-                    }
-                )
+                hb = {
+                    "level": "info",
+                    "message": "KI: arbeitet noch…",
+                    "step": "stream.heartbeat",
+                    "data": {"seconds": int(elapsed)},
+                }
+                await _log_plan_event(hb)
+                yield sse_encode(hb)
 
         # Drain remaining events
         while True:
             try:
                 ev = q.get_nowait()
                 if isinstance(ev, dict):
+                    await _log_plan_event(ev)
                     yield sse_encode(ev)
             except Exception:
                 break
@@ -330,16 +351,21 @@ async def plan_goal_stream(goal_id: UUID, context: str = Form("")) -> StreamingR
                 {
                     "level": "error",
                     "message": "Plan konnte nicht erstellt werden",
+                    "step": "stream.plan_failed",
                     "data": {"error": err},
                 }
             )
             yield sse_encode({"redirect": f"/?goal={goal_id}&plan_error={err}"})
             return
 
-        yield sse_encode({"level": "info", "message": "Plan: wird gespeichert"})
+        saving = {"level": "info", "message": "Plan: wird gespeichert", "step": "stream.apply_plan"}
+        await _log_plan_event(saving)
+        yield sse_encode(saving)
         with open_session(engine) as session:
             apply_plan(session, goal_id, result.goal, plan_source=result.source)
-        yield sse_encode({"level": "info", "message": "Fertig"})
+        done = {"level": "info", "message": "Fertig", "step": "stream.done"}
+        await _log_plan_event(done)
+        yield sse_encode(done)
         yield sse_encode({"redirect": f"/?goal={goal_id}"})
 
     headers = {

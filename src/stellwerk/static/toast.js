@@ -32,10 +32,11 @@
     msg.textContent = String(message || '');
     t.appendChild(msg);
 
-    if (data && (data.route || data.task || data.status || data.attempt || data.error)) {
+    if (data && (data.step || data.route || data.task || data.status || data.attempt || data.error)) {
       const meta = document.createElement('div');
       meta.className = 'toast-meta';
       const parts = [];
+      if (data.step) parts.push(String(data.step));
       if (data.route) parts.push(String(data.route));
       if (data.task) parts.push(String(data.task));
       if (data.status) parts.push(`Status ${data.status}`);
@@ -124,7 +125,8 @@
         }
         if (ev.message) {
           const lvl = ev.level || 'info';
-          const data = ev.data || null;
+          const data = ev.data ? { ...ev.data } : {};
+          if (ev.step) data.step = ev.step;
           const isHeartbeat = ev.message === 'KI: arbeitet noch…';
           const suffix = isHeartbeat && data && typeof data.seconds === 'number' ? ` (${data.seconds}s)` : '';
           const done = ev.message === 'Fertig' || ev.message === 'KI: Plan fertig';

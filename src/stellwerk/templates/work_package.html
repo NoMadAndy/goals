@@ -35,6 +35,65 @@
             <label class="label">Notizen (dein Kontext, Stolpersteine, Definition of Done)</label>
             <textarea name="notes" placeholder="Was ist hier genau zu tun?">{{ wp.notes }}</textarea>
 
+            {% set d = (wp.notes | wp_details(wp.title)) %}
+            <div class="card" style="padding:12px">
+              <div class="muted" style="margin-bottom:8px; font-weight:900">Vorschau (strukturierte Details)</div>
+
+              {% if d.summary %}
+                <div class="wp-section">
+                  <div class="wp-h">Kurzfassung</div>
+                  <div class="muted" style="white-space: pre-wrap">{{ d.summary }}</div>
+                </div>
+              {% endif %}
+
+              {% if d.steps and d.steps|length > 0 %}
+                <div class="wp-section">
+                  <div class="wp-h">Ablauf</div>
+                  <ol class="wp-ol">
+                    {% for s in d.steps %}
+                      <li>{{ s }}</li>
+                    {% endfor %}
+                  </ol>
+                </div>
+              {% endif %}
+
+              {% if d.checklist and d.checklist|length > 0 %}
+                <div class="wp-section">
+                  <div class="wp-h">Definition of Done</div>
+                  <div class="wp-checklist">
+                    {% for c in d.checklist %}
+                      <label class="wp-check">
+                        <input type="checkbox" disabled {% if c.done %}checked{% endif %} />
+                        <span>{{ c.text }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+
+              {% if d.risks and d.risks|length > 0 %}
+                <div class="wp-section">
+                  <div class="wp-h">Risiken</div>
+                  <ul class="wp-ul">
+                    {% for r in d.risks %}
+                      <li>{{ r }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+
+              {% if d.sources and d.sources|length > 0 %}
+                <div class="wp-section">
+                  <div class="wp-h">Quellen</div>
+                  <ul class="wp-ul">
+                    {% for u in d.sources %}
+                      <li><a class="link" href="{{ u }}" target="_blank" rel="noopener noreferrer">{{ u }}</a></li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+            </div>
+
             <div class="grid2">
               <div>
                 <label class="label">Länge (Aufwand)</label>
