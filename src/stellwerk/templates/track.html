@@ -164,7 +164,29 @@
           }
         }
 
-        // Draw connector edges first
+        // Precompute outgoing order (for deterministic branch offsets)
+        const outgoingOrder = new Map();
+        for (const e of edges) {
+          if (!nodes.has(e.from) || !nodes.has(e.to)) continue;
+          const list = outgoingOrder.get(e.from) || [];
+          list.push(e.to);
+          outgoingOrder.set(e.from, list);
+        }
+        for (const [from, list] of outgoingOrder.entries()) {
+          list.sort();
+        }
+
+        const branchOffsetX = (from, to) => {
+          const list = outgoingOrder.get(from) || [];
+          if (list.length <= 1) return 0;
+          const idx = list.indexOf(to);
+          if (idx < 0) return 0;
+          const step = 18;
+          const center = (list.length - 1) / 2;
+          return (idx - center) * step;
+        };
+
+        // Draw connector edges first (as elbow paths, so branches stay visible)
         for (const e of edges) {
           const a = pos.get(e.from);
           const b = pos.get(e.to);
@@ -172,13 +194,18 @@
 
           const key = `${e.from}→${e.to}`;
           const cls = activePairs.has(key) ? 'graph-branch active' : 'graph-branch';
+
+          const x0 = a.x + branchOffsetX(e.from, e.to);
+          const y0 = a.y + segLen / 2;
+          const x3 = b.x;
+          const y3 = b.y - segLen / 2;
+          const midY = (y0 + y3) / 2;
+
           svg.appendChild(
-            el('line', {
-              x1: a.x,
-              y1: a.y + segLen / 2,
-              x2: b.x,
-              y2: b.y - segLen / 2,
+            el('path', {
+              d: `M ${x0} ${y0} L ${x0} ${midY} L ${x3} ${midY} L ${x3} ${y3}`,
               class: cls,
+              fill: 'none',
             })
           );
         }

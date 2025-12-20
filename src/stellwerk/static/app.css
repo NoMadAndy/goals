@@ -186,7 +186,7 @@ button:hover{filter:brightness(1.05)}
 .graph-line.active{stroke: rgba(51,214,255,.65)}
 .graph-line.missing{stroke-dasharray: 8 8; opacity:.45}
 
-.graph-branch{stroke: rgba(255,255,255,.18); stroke-width:4; stroke-linecap:round; vector-effect: non-scaling-stroke; opacity:.75}
+.graph-branch{stroke: rgba(255,255,255,.18); stroke-width:4; stroke-linecap:round; stroke-linejoin:round; vector-effect: non-scaling-stroke; opacity:.75}
 .graph-branch.active{stroke: rgba(51,214,255,.55); opacity:1}
 .graph-branch.chosen{stroke: rgba(51,214,255,.55); opacity:1}
 
